@@ -11,8 +11,10 @@ const router = {
     '/': renderHome,
     '/login': renderLogin,
     '/register': renderRegister,
-    '/dashboard': renderDashboard,
-    '/ideas': renderIdeas,
+    '/inbox': renderInbox,
+    '/my-ideas': renderMyIdeas,
+    '/ongoing-projects': renderOngoingProjects,
+    '/completed-projects': renderCompletedProjects,
     '/idea': renderIdeaDetail,
     '/post-idea': renderPostIdea,
     '/chat': renderChat,
@@ -20,6 +22,7 @@ const router = {
     '/request': renderRequestDetail,
     '/development': renderDevelopmentDetail,
     '/developers': renderDevelopers,
+    '/developer': renderDeveloperProfile,
     '/profile-edit': () => window.location.href = '/profile-edit.html'
 };
 
@@ -35,44 +38,115 @@ function render() {
 }
 
 
-function renderHome() {
-    // ログインしている場合はダッシュボードにリダイレクト
-    if (state.token) {
-        navigateTo('/dashboard');
-        return;
-    }
-    
-    // ログインしていない場合のホームページ
-    document.getElementById('app').innerHTML = `
-        <div class="min-h-screen bg-gray-50">
-            <!-- Navigation -->
-            <nav class="bg-white shadow-sm">
-                <div class="container mx-auto px-4 py-4">
-                    <div class="flex justify-between items-center">
-                        <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
-                        <div class="flex gap-4">
-                            <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア一覧</a>
-                            <a href="/developers" onclick="navigateTo('/developers'); return false;" class="text-gray-600 hover:text-indigo-600">開発者一覧</a>
-                            <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
-                            <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
+async function renderHome() {
+    try {
+        const response = await fetch(`${API_URL}/ideas`);
+        const ideas = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold mb-2">みんなのアイディア</h1>
+                    <p class="text-gray-600">開発者を募集しているアイディアを探してみましょう</p>
+                </div>
+                
+                ${state.token && state.user?.role === 'client' ? `
+                    <div class="mb-6 flex justify-end">
+                        <a href="/post-idea" onclick="navigateTo('/post-idea'); return false;" 
+                           class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                            新しいアイディアを投稿
+                        </a>
+                    </div>
+                ` : ''}
+                
+                ${ideas.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        <p class="text-gray-500">まだアイディアが投稿されていません</p>
+                    </div>
+                ` : `
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        ${ideas.map(idea => `
+                            <div class="bg-white rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                                 onclick="navigateTo('/idea?id=${idea.id}')">
+                                ${idea.thumbnail_url ? `
+                                    <div class="aspect-w-16 aspect-h-9">
+                                        <img src="${idea.thumbnail_url}" alt="${idea.title}" 
+                                             class="w-full h-48 object-cover rounded-t-lg">
+                                    </div>
+                                ` : `
+                                    <div class="h-48 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-t-lg flex items-center justify-center">
+                                        <svg class="w-16 h-16 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                        </svg>
+                                    </div>
+                                `}
+                                <div class="p-6">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h3 class="text-xl font-semibold line-clamp-1">${idea.title}</h3>
+                                        ${idea.budget ? `
+                                            <span class="text-sm text-gray-500 whitespace-nowrap ml-2">
+                                                ¥${idea.budget.toLocaleString()}
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                    <p class="text-gray-600 mb-4 line-clamp-2">${idea.description}</p>
+                                    <div class="flex items-center justify-between text-sm text-gray-500">
+                                        <span>${idea.username}</span>
+                                        <span class="bg-${idea.status === 'open' ? 'green' : idea.status === 'in_progress' ? 'yellow' : 'blue'}-100 
+                                                     text-${idea.status === 'open' ? 'green' : idea.status === 'in_progress' ? 'yellow' : 'blue'}-800 
+                                                     px-2 py-1 rounded">
+                                            ${idea.status === 'open' ? '募集中' : idea.status === 'in_progress' ? '開発中' : '完了'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        if (state.token) {
+            document.getElementById('app').innerHTML = createLayout(content, 'home');
+            setPageTitle('みんなのアイディア');
+            setupLayoutEventListeners();
+        } else {
+            // ログインしていない場合は通常のレイアウト
+            document.getElementById('app').innerHTML = `
+                <div class="min-h-screen bg-gray-50">
+                    <!-- Navigation -->
+                    <nav class="bg-white shadow-sm">
+                        <div class="container mx-auto px-4 py-4">
+                            <div class="flex justify-between items-center">
+                                <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
+                                <div class="flex gap-4">
+                                    <a href="/" onclick="navigateTo('/'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア一覧</a>
+                                    <a href="/developers" onclick="navigateTo('/developers'); return false;" class="text-gray-600 hover:text-indigo-600">開発者一覧</a>
+                                    <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
+                                    <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </nav>
+                    
+                    <main class="container mx-auto px-4 py-8">
+                        ${content}
+                    </main>
                 </div>
-            </nav>
-            
-            <!-- Main Content -->
-            <main class="container mx-auto px-4 py-16">
-                <div class="max-w-4xl mx-auto text-center">
-                    <h2 class="text-4xl font-bold mb-6">アイディアを形にするMVP量産所</h2>
-                    <p class="text-xl text-gray-600 mb-8">日常の困りごとを投稿して、ライブコーダーが即席で開発</p>
-                    <div class="flex gap-4 justify-center">
-                        <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg hover:bg-indigo-700">今すぐ始める</a>
-                        <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="border border-indigo-600 text-indigo-600 px-8 py-3 rounded-lg text-lg hover:bg-indigo-50">アイディアを見る</a>
-                    </div>
-                </div>
-            </main>
-        </div>
-    `;
+            `;
+        }
+    } catch (error) {
+        console.error('Error fetching ideas:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        if (state.token) {
+            document.getElementById('app').innerHTML = createLayout(errorContent, 'home');
+        } else {
+            document.getElementById('app').innerHTML = errorContent;
+        }
+    }
 }
 
 function renderLogin() {
@@ -146,275 +220,6 @@ function renderRegister() {
     document.getElementById('app').innerHTML = createLayout(content, 'register');
     setPageTitle('新規登録');
     setupLayoutEventListeners();
-}
-
-async function renderDashboard() {
-    if (!state.token) {
-        navigateTo('/login');
-        return;
-    }
-
-    const content = state.user?.role === 'client' 
-        ? await renderClientDashboard()
-        : await renderDeveloperDashboard();
-    
-    document.getElementById('app').innerHTML = createLayout(content, 'dashboard');
-    setPageTitle('ダッシュボード');
-    setupLayoutEventListeners();
-    
-    // ユーザー情報をlocalStorageに保存（レイアウトで使用）
-    if (state.user) {
-        localStorage.setItem('user', JSON.stringify(state.user));
-        localStorage.setItem('userRole', state.user.role);
-    }
-}
-
-async function renderClientDashboard() {
-    try {
-        const response = await fetch(`${API_URL}/dashboard`, {
-            headers: { 'Authorization': `Bearer ${state.token}` }
-        });
-        const data = await response.json();
-        const ideas = data.ideas || [];
-        const developments = data.developments || [];
-        
-        return `
-            <div>
-                ${developments.length > 0 ? `
-                    <div class="mb-8">
-                        <h2 class="text-2xl font-bold mb-4">進行中の開発プロジェクト</h2>
-                        <div class="grid gap-4">
-                            ${developments.map(dev => `
-                                <div class="bg-blue-50 border border-blue-200 p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
-                                     onclick="navigateTo('/development?id=${dev.id}')">
-                                    <div class="flex justify-between items-center">
-                                        <div>
-                                            <h3 class="text-lg font-semibold text-blue-900">${dev.idea_title}</h3>
-                                            <p class="text-sm text-gray-600">開発者: ${dev.developer_username}</p>
-                                            <p class="text-xs text-gray-500">開始日: ${new Date(dev.created_at).toLocaleDateString()}</p>
-                                        </div>
-                                        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                                            開発詳細へ
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <h2 class="text-2xl font-bold mb-6">マイアイディア</h2>
-                <div class="grid gap-4">
-                    ${ideas.map(idea => `
-                        <div class="bg-white p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
-                             onclick="navigateTo('/idea?id=${idea.id}')">
-                            <div class="flex justify-between items-start">
-                                <div class="flex-1">
-                                    <h3 class="text-lg font-semibold">${idea.title}</h3>
-                                    <p class="text-gray-600 mb-2">${idea.description}</p>
-                                </div>
-                                ${idea.pending_requests_count > 0 ? `
-                                    <div class="ml-4 text-center">
-                                        <div class="text-2xl font-bold text-orange-600">${idea.pending_requests_count}</div>
-                                        <div class="text-xs text-gray-600">リクエスト</div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                            <div class="flex justify-between items-center mt-2">
-                                <span class="inline-block px-3 py-1 text-sm rounded-full 
-                                    ${idea.status === 'open' ? 'bg-green-100 text-green-800' : 
-                                      idea.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                                      idea.status === 'completed' ? 'bg-purple-100 text-purple-800' :
-                                      'bg-blue-100 text-blue-800'}">
-                                    ${idea.status === 'open' ? '公開募集中' : 
-                                      idea.status === 'in_progress' ? '開発中' :
-                                      idea.status === 'completed' ? '完了' : ''}
-                                </span>
-                                <button onclick="event.stopPropagation(); navigateTo('/idea?id=${idea.id}')" 
-                                        class="text-blue-600 hover:underline">
-                                    詳細を見る
-                                </button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    } catch (error) {
-        return '<p>エラーが発生しました</p>';
-    }
-}
-
-async function renderDeveloperDashboard() {
-    try {
-        const response = await fetch(`${API_URL}/dashboard`, {
-            headers: { 'Authorization': `Bearer ${state.token}` }
-        });
-        const data = await response.json();
-        const developments = data.developments || [];
-        const requests = data.requests || [];
-        
-        return `
-            <div>
-                ${developments.length > 0 ? `
-                    <div class="mb-8">
-                        <h2 class="text-2xl font-bold mb-4">進行中の開発プロジェクト</h2>
-                        <div class="grid gap-4">
-                            ${developments.map(dev => `
-                                <div class="bg-green-50 border border-green-200 p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
-                                     onclick="navigateTo('/development?id=${dev.id}')">
-                                    <div class="flex justify-between items-center">
-                                        <div>
-                                            <h3 class="text-lg font-semibold text-green-900">${dev.idea_title}</h3>
-                                            <p class="text-sm text-gray-600">依頼者: ${dev.client_username}</p>
-                                            <p class="text-xs text-gray-500">開始日: ${new Date(dev.created_at).toLocaleDateString()}</p>
-                                        </div>
-                                        <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                                            開発詳細へ
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                ${requests.length > 0 ? `
-                    <div>
-                        <h2 class="text-2xl font-bold mb-4">開発リクエスト</h2>
-                        <div class="grid gap-4">
-                            ${requests.map(req => `
-                                <div class="bg-white p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
-                                     onclick="navigateTo('/request?id=${req.id}')">
-                                    <h3 class="text-lg font-semibold">${req.title}</h3>
-                                    <p class="text-gray-600 mb-2">${req.description}</p>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-sm text-gray-500">アイデア: ${req.idea_title}</span>
-                                        <span class="px-3 py-1 text-sm rounded-full ${
-                                            req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                            req.status === 'accepted' || req.status === 'in_progress' ? 'bg-green-100 text-green-800' :
-                                            'bg-gray-100 text-gray-800'
-                                        }">
-                                            ${getStatusLabel(req.status)}
-                                        </span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    } catch (error) {
-        return '<p>エラーが発生しました</p>';
-    }
-}
-
-async function renderIdeas() {
-    try {
-        const response = await fetch(`${API_URL}/ideas`);
-        const ideas = await response.json();
-        
-        const content = `
-            <div class="container mx-auto px-4">
-                <h2 class="text-3xl font-bold mb-8 text-center">公開アイディア一覧</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    ${ideas.map(idea => `
-                        <div class="group relative overflow-hidden rounded-lg shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1" 
-                             onclick="navigateTo('/idea?id=${idea.id}')">
-                            <!-- サムネイル -->
-                            <div class="aspect-w-16 aspect-h-12 overflow-hidden bg-gray-200">
-                                ${idea.thumbnail ? `
-                                    <img src="${idea.thumbnail}" alt="${idea.title}" 
-                                         class="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300">
-                                ` : `
-                                    <div class="w-full h-48 bg-gradient-to-br from-indigo-400 to-purple-600 flex items-center justify-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-white opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                        </svg>
-                                    </div>
-                                `}
-                            </div>
-                            
-                            <!-- コンテンツ -->
-                            <div class="p-4 bg-white">
-                                <h3 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2">${idea.title}</h3>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-2xl font-bold text-indigo-600">
-                                        ${idea.budget ? `¥${idea.budget.toLocaleString()}` : '要相談'}
-                                    </span>
-                                    <span class="text-xs text-gray-500">
-                                        by ${idea.username || idea.user_email}
-                                    </span>
-                                </div>
-                                ${idea.pending_requests_count > 0 ? `
-                                    <div class="mt-2 text-sm text-orange-600 font-semibold">
-                                        🔔 ${idea.pending_requests_count}件の開発リクエスト
-                                    </div>
-                                ` : ''}
-                            </div>
-                            
-                            <!-- ステータスバッジ -->
-                            <div class="absolute top-2 right-2">
-                                <span class="text-xs px-2 py-1 rounded-full ${
-                                    idea.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                                    idea.status === 'delivered' ? 'bg-purple-100 text-purple-800' :
-                                    idea.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    'bg-blue-100 text-blue-800'
-                                }">
-                                    ${idea.status === 'in_progress' ? '開発中' :
-                                      idea.status === 'delivered' ? '納品済み' :
-                                      idea.status === 'completed' ? '完了' : '募集中'}
-                                </span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-                
-                ${ideas.length === 0 ? `
-                    <div class="text-center py-12">
-                        <p class="text-gray-500 text-lg">現在、公開されているアイディアはありません</p>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        
-        if (state.token) {
-            document.getElementById('app').innerHTML = createLayout(content, 'ideas');
-            setPageTitle('アイディア一覧');
-            setupLayoutEventListeners();
-        } else {
-            // ログインしていない場合は通常のレイアウト
-            document.getElementById('app').innerHTML = `
-                <div class="min-h-screen bg-gray-50">
-                    <!-- Navigation -->
-                    <nav class="bg-white shadow-sm">
-                        <div class="container mx-auto px-4 py-4">
-                            <div class="flex justify-between items-center">
-                                <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
-                                <div class="flex gap-4">
-                                    <a href="/" onclick="navigateTo('/'); return false;" class="text-gray-600 hover:text-indigo-600">ホーム</a>
-                                    <a href="/developers" onclick="navigateTo('/developers'); return false;" class="text-gray-600 hover:text-indigo-600">開発者一覧</a>
-                                    <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
-                                    <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
-                                </div>
-                            </div>
-                        </div>
-                    </nav>
-                    <main>
-                        ${content}
-                    </main>
-                </div>
-            `;
-        }
-    } catch (error) {
-        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
-        if (state.token) {
-            document.getElementById('app').innerHTML = createLayout(errorContent, 'ideas');
-        } else {
-            document.getElementById('app').innerHTML = errorContent;
-        }
-    }
 }
 
 function renderPostIdea() {
@@ -890,7 +695,7 @@ async function handleLogin(event) {
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
             localStorage.setItem('userRole', data.user.role);
-            navigateTo('/dashboard');
+            navigateTo('/');
         } else {
             alert(data.error);
         }
@@ -922,7 +727,7 @@ async function handleRegister(event) {
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
             localStorage.setItem('userRole', data.user.role);
-            navigateTo('/dashboard');
+            navigateTo('/');
         } else {
             alert(data.error);
         }
@@ -952,7 +757,7 @@ async function handlePostIdea(event) {
         
         const data = await response.json();
         if (response.ok) {
-            navigateTo('/dashboard');
+            navigateTo('/');
         } else {
             alert(data.error);
         }
@@ -982,7 +787,7 @@ async function startDevelopment(ideaId) {
             const data = await response.json();
             if (response.ok) {
                 alert('開発を開始しました');
-                navigateTo('/dashboard');
+                navigateTo('/');
             } else {
                 alert(data.error);
             }
@@ -1011,7 +816,7 @@ async function handleSubmitDeliverable(event, developmentId) {
         const data = await response.json();
         if (response.ok) {
             alert('成果物を提出しました');
-            renderDashboard();
+            navigateTo('/');
         } else {
             alert(data.error);
         }
@@ -1296,7 +1101,7 @@ async function deleteIdea(ideaId) {
                 setTimeout(() => successMessage.remove(), 3000);
                 
                 // ダッシュボードに戻る
-                navigateTo('/dashboard');
+                navigateTo('/');
             } else {
                 alert('削除に失敗しました');
             }
@@ -1350,7 +1155,7 @@ async function handleSendDevelopmentRequest(ideaId) {
             const data = await response.json();
             if (response.ok) {
                 alert('開発依頼リクエストを送信しました！');
-                navigateTo('/dashboard');
+                navigateTo('/');
             } else {
                 alert(data.error || '送信に失敗しました');
             }
@@ -1871,7 +1676,7 @@ async function renderDevelopmentDetail() {
     const developmentId = urlParams.get('id');
     
     if (!developmentId || !state.token) {
-        navigateTo('/dashboard');
+        navigateTo('/');
         return;
     }
 
@@ -2138,6 +1943,405 @@ window.createThread = createThread;
 window.showThreadMessages = showThreadMessages;
 window.sendThreadMessage = sendThreadMessage;
 
+// 開発者プロフィールページ
+async function renderDeveloperProfile() {
+    console.log('renderDeveloperProfile called');
+    const urlParams = new URLSearchParams(window.location.search);
+    const developerId = urlParams.get('id');
+    console.log('Developer ID:', developerId);
+    
+    if (!developerId) {
+        console.log('No developer ID, redirecting to /developers');
+        navigateTo('/developers');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/developer-profiles/profile/${developerId}`);
+        if (!response.ok) {
+            throw new Error('開発者が見つかりません');
+        }
+        
+        const data = await response.json();
+        const { user, profile, skills, languages, specializations, stats } = data;
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- 左側：基本情報 -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="text-center mb-6">
+                                ${profile?.profile_image_url ? 
+                                    `<img src="${profile.profile_image_url}" alt="${user.username}" class="w-32 h-32 rounded-full mx-auto mb-4">` :
+                                    `<div class="w-32 h-32 rounded-full bg-gray-200 mx-auto mb-4 flex items-center justify-center">
+                                        <i class="fas fa-user text-4xl text-gray-400"></i>
+                                    </div>`
+                                }
+                                <h2 class="text-2xl font-bold text-gray-800">${user.username}</h2>
+                                <p class="text-gray-600">${user.email}</p>
+                            </div>
+                            
+                            ${profile ? `
+                                <div class="space-y-4 text-sm">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-gray-600">経験年数</span>
+                                        <span class="font-medium">${profile.years_of_experience || 0}年</span>
+                                    </div>
+                                    
+                                    ${profile.hourly_rate ? `
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">時給</span>
+                                            <span class="font-medium">¥${profile.hourly_rate.toLocaleString()}</span>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${profile.project_rate ? `
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-gray-600">プロジェクト単価</span>
+                                            <span class="font-medium">¥${profile.project_rate.toLocaleString()}</span>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-gray-600">受注状況</span>
+                                        <span class="${profile.available_for_hire ? 'text-green-600' : 'text-red-600'} font-medium">
+                                            ${profile.available_for_hire ? '受注可能' : '受注不可'}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 pt-6 border-t">
+                                    <div class="text-sm text-gray-600 mb-2">実績</div>
+                                    <div class="grid grid-cols-2 gap-4 text-center">
+                                        <div>
+                                            <div class="text-2xl font-bold text-indigo-600">${stats.completed_projects || 0}</div>
+                                            <div class="text-xs text-gray-500">完了プロジェクト</div>
+                                        </div>
+                                        <div>
+                                            <div class="text-2xl font-bold text-green-600">${stats.accepted_requests || 0}</div>
+                                            <div class="text-xs text-gray-500">承認リクエスト</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : '<p class="text-gray-500 text-center">プロフィール未設定</p>'}
+                            
+                            ${renderDeveloperActionButtons(profile)}
+                        </div>
+                        
+                        ${renderDeveloperLinks(profile)}
+                    </div>
+                    
+                    <!-- 右側：詳細情報 -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- 自己紹介 -->
+                        ${profile?.bio ? `
+                            <div class="bg-white rounded-lg shadow p-6">
+                                <h3 class="text-lg font-semibold mb-3">自己紹介</h3>
+                                <p class="text-gray-700 whitespace-pre-wrap">${profile.bio}</p>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- スキル -->
+                        ${skills.length > 0 ? `
+                            <div class="bg-white rounded-lg shadow p-6">
+                                <h3 class="text-lg font-semibold mb-4">スキル</h3>
+                                <div class="space-y-4">
+                                    ${groupSkillsByCategory(skills).map(category => `
+                                        <div>
+                                            <h4 class="text-sm font-medium text-gray-600 mb-2">${category.name}</h4>
+                                            <div class="flex flex-wrap gap-2">
+                                                ${category.skills.map(skill => `
+                                                    <div class="bg-gray-100 px-3 py-1 rounded-full text-sm">
+                                                        <span class="font-medium">${skill.name}</span>
+                                                        <span class="text-gray-500 ml-1">${renderProficiency(skill.proficiency_level)}</span>
+                                                        ${skill.years_of_experience > 0 ? `<span class="text-gray-500 ml-1">(${skill.years_of_experience}年)</span>` : ''}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- 専門分野 -->
+                        ${specializations.length > 0 ? `
+                            <div class="bg-white rounded-lg shadow p-6">
+                                <h3 class="text-lg font-semibold mb-4">専門分野</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    ${specializations.map(spec => `
+                                        <div class="flex items-start">
+                                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                                            <div>
+                                                <div class="font-medium">${spec.name}</div>
+                                                ${spec.description ? `<div class="text-sm text-gray-600">${spec.description}</div>` : ''}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- 対応言語 -->
+                        ${languages.length > 0 ? `
+                            <div class="bg-white rounded-lg shadow p-6">
+                                <h3 class="text-lg font-semibold mb-4">対応言語</h3>
+                                <div class="flex flex-wrap gap-3">
+                                    ${languages.map(lang => `
+                                        <div class="flex items-center bg-blue-50 px-4 py-2 rounded-lg">
+                                            <span class="font-medium">${lang.name}</span>
+                                            <span class="ml-2 text-sm text-gray-600">${renderLanguageProficiency(lang.proficiency_level)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'developers');
+        setPageTitle(`${user.username} - 開発者プロフィール`);
+        setupLayoutEventListeners();
+        
+        // グローバル関数を設定
+        window.showDeveloperRequestModal = showDeveloperRequestModal;
+        
+    } catch (error) {
+        console.error('Error loading developer profile:', error);
+        const errorContent = `
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow p-8 text-center">
+                    <p class="text-red-600 mb-4">${error.message}</p>
+                    <a href="/developers" onclick="navigateTo('/developers'); return false;" 
+                       class="text-indigo-600 hover:underline">開発者一覧に戻る</a>
+                </div>
+            </div>
+        `;
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'developers');
+        setPageTitle('エラー');
+        setupLayoutEventListeners();
+    }
+}
+
+// 開発者プロフィール用のヘルパー関数
+function groupSkillsByCategory(skills) {
+    const grouped = {};
+    skills.forEach(skill => {
+        if (!grouped[skill.category]) {
+            grouped[skill.category] = {
+                name: skill.category,
+                skills: []
+            };
+        }
+        grouped[skill.category].skills.push(skill);
+    });
+    return Object.values(grouped);
+}
+
+function renderProficiency(level) {
+    const stars = ['☆☆☆☆☆', '★☆☆☆☆', '★★☆☆☆', '★★★☆☆', '★★★★☆', '★★★★★'];
+    return stars[level] || stars[0];
+}
+
+function renderLanguageProficiency(level) {
+    const levels = {
+        'native': 'ネイティブ',
+        'fluent': '流暢',
+        'conversational': '会話可能',
+        'basic': '基礎レベル'
+    };
+    return levels[level] || level;
+}
+
+function renderDeveloperLinks(profile) {
+    if (!profile) return '';
+    
+    const links = [];
+    if (profile.portfolio_url) {
+        links.push(`<a href="${profile.portfolio_url}" target="_blank" class="flex items-center text-gray-600 hover:text-indigo-600">
+            <i class="fas fa-globe mr-2"></i> ポートフォリオ
+        </a>`);
+    }
+    if (profile.github_url) {
+        links.push(`<a href="${profile.github_url}" target="_blank" class="flex items-center text-gray-600 hover:text-indigo-600">
+            <i class="fab fa-github mr-2"></i> GitHub
+        </a>`);
+    }
+    if (profile.gitlab_url) {
+        links.push(`<a href="${profile.gitlab_url}" target="_blank" class="flex items-center text-gray-600 hover:text-indigo-600">
+            <i class="fab fa-gitlab mr-2"></i> GitLab
+        </a>`);
+    }
+    
+    if (links.length === 0) return '';
+    
+    return `
+        <div class="bg-white rounded-lg shadow p-6 mt-6">
+            <h3 class="text-sm font-semibold text-gray-600 mb-3">リンク</h3>
+            <div class="space-y-2">
+                ${links.join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderDeveloperActionButtons(profile) {
+    const token = localStorage.getItem('token');
+    const userRole = localStorage.getItem('userRole');
+    
+    if (!token || !profile || !profile.available_for_hire) {
+        return '';
+    }
+    
+    if (userRole === 'client') {
+        return `
+            <button onclick="showDeveloperRequestModal()" 
+                class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 transition">
+                <i class="fas fa-paper-plane mr-2"></i>開発リクエストを送る
+            </button>
+        `;
+    }
+    
+    return '';
+}
+
+async function showDeveloperRequestModal() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        alert('ログインが必要です');
+        navigateTo('/login');
+        return;
+    }
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const developerId = urlParams.get('id');
+    
+    // 自分のアイデアを取得
+    try {
+        const response = await fetch(`${API_URL}/ideas/my-ideas`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('アイデアの取得に失敗しました');
+        }
+        
+        const ideas = await response.json();
+        const openIdeas = ideas.filter(idea => idea.status === 'open');
+        
+        if (openIdeas.length === 0) {
+            alert('開発リクエストを送信できるアイデアがありません。まずアイデアを投稿してください。');
+            return;
+        }
+        
+        // モーダルを作成
+        const modal = document.createElement('div');
+        modal.id = 'requestModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-semibold mb-4">開発リクエストを送信</h3>
+                <form onsubmit="sendDevelopmentRequestToDeveloper(event, ${developerId})">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">アイデアを選択</label>
+                        <select id="requestIdeaId" required class="w-full border-gray-300 rounded-md shadow-sm">
+                            <option value="">選択してください</option>
+                            ${openIdeas.map(idea => `<option value="${idea.id}">${idea.title}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">提案予算（円）</label>
+                        <input type="number" id="requestBudget" required min="0" step="1000"
+                            class="w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">希望納期</label>
+                        <input type="date" id="requestDeadline" required
+                            class="w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">メッセージ</label>
+                        <textarea id="requestMessage" rows="3" required
+                            class="w-full border-gray-300 rounded-md shadow-sm"
+                            placeholder="開発への意気込みや質問など"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="closeDevelopmentRequestModal()"
+                            class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                            キャンセル
+                        </button>
+                        <button type="submit"
+                            class="px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700">
+                            送信
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // 明日の日付をデフォルトに設定
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 7);
+        document.getElementById('requestDeadline').value = tomorrow.toISOString().split('T')[0];
+        
+        // グローバル関数を設定
+        window.closeDevelopmentRequestModal = closeDevelopmentRequestModal;
+        window.sendDevelopmentRequestToDeveloper = sendDevelopmentRequestToDeveloper;
+        
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function closeDevelopmentRequestModal() {
+    const modal = document.getElementById('requestModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function sendDevelopmentRequestToDeveloper(event, developerId) {
+    event.preventDefault();
+    
+    const token = localStorage.getItem('token');
+    const ideaId = document.getElementById('requestIdeaId').value;
+    const budget = document.getElementById('requestBudget').value;
+    const deadline = document.getElementById('requestDeadline').value;
+    const message = document.getElementById('requestMessage').value;
+    
+    try {
+        const response = await fetch(`${API_URL}/requests/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                idea_id: parseInt(ideaId),
+                developer_id: parseInt(developerId),
+                proposed_budget: parseInt(budget),
+                proposed_deadline: deadline,
+                message: message
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || '送信に失敗しました');
+        }
+        
+        alert('開発リクエストを送信しました');
+        closeDevelopmentRequestModal();
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
 // 開発者一覧ページ
 async function renderDevelopers() {
     let allSpecializations = [];
@@ -2199,7 +2403,7 @@ async function renderDevelopers() {
     function renderDeveloperCard(dev) {
         return `
             <div class="bg-white rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
-                 onclick="window.location.href='/developer-profile.html?id=${dev.id}'">
+                 onclick="navigateTo('/developer?id=${dev.id}')">
                 <div class="p-6">
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center">
@@ -2243,7 +2447,7 @@ async function renderDevelopers() {
                     </div>
                     
                     <div class="mt-4 pt-4 border-t">
-                        <a href="/developer-profile.html?id=${dev.id}" 
+                        <a href="/developer?id=${dev.id}" onclick="navigateTo('/developer?id=${dev.id}'); return false;" 
                            class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
                             プロフィールを見る <i class="fas fa-arrow-right ml-1"></i>
                         </a>
@@ -2353,6 +2557,382 @@ async function renderDevelopers() {
     
     // 初期検索を実行
     setTimeout(() => searchDevelopers(), 100);
+}
+
+// 依頼者のホームページ
+async function renderClientHome() {
+    try {
+        // 最新のアイディアを取得
+        const [myIdeasRes, ongoingRes] = await Promise.all([
+            fetch(`${API_URL}/ideas/my-ideas`, {
+                headers: { 'Authorization': `Bearer ${state.token}` }
+            }),
+            fetch(`${API_URL}/ideas/my-ideas?status=in_progress`, {
+                headers: { 'Authorization': `Bearer ${state.token}` }
+            })
+        ]);
+        
+        const myIdeas = await myIdeasRes.json();
+        const ongoingProjects = await ongoingRes.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold mb-2">ようこそ、${state.user.username}さん</h1>
+                    <p class="text-gray-600">あなたのアイディアを形にしましょう</p>
+                </div>
+                
+                <!-- クイックアクション -->
+                <div class="grid md:grid-cols-3 gap-6 mb-8">
+                    <a href="/post-idea" onclick="navigateTo('/post-idea'); return false;" 
+                       class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition text-center">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        <h3 class="font-semibold">新しいアイディアを投稿</h3>
+                        <p class="text-sm text-gray-600 mt-1">あなたのアイディアを共有しましょう</p>
+                    </a>
+                    
+                    <a href="/developers" onclick="navigateTo('/developers'); return false;" 
+                       class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition text-center">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <h3 class="font-semibold">開発者を探す</h3>
+                        <p class="text-sm text-gray-600 mt-1">あなたのアイディアを実現する開発者を見つけましょう</p>
+                    </a>
+                    
+                    <a href="/ideas" onclick="navigateTo('/ideas'); return false;" 
+                       class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition text-center">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        <h3 class="font-semibold">みんなのアイディアを見る</h3>
+                        <p class="text-sm text-gray-600 mt-1">他の人のアイディアからインスピレーションを得ましょう</p>
+                    </a>
+                </div>
+                
+                <!-- 進行中のプロジェクト -->
+                ${ongoingProjects.length > 0 ? `
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold">進行中のプロジェクト</h2>
+                            <a href="/ongoing-projects" onclick="navigateTo('/ongoing-projects'); return false;" 
+                               class="text-indigo-600 hover:text-indigo-700 text-sm">すべて見る →</a>
+                        </div>
+                        <div class="grid gap-4">
+                            ${ongoingProjects.slice(0, 3).map(project => `
+                                <div class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                                     onclick="navigateTo('/idea?id=${project.id}')">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <h4 class="font-semibold">${project.title}</h4>
+                                            <p class="text-sm text-gray-600 mt-1">${project.description}</p>
+                                        </div>
+                                        <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm">開発中</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- 最近のアイディア -->
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">あなたのアイディア</h2>
+                        <a href="/my-ideas" onclick="navigateTo('/my-ideas'); return false;" 
+                           class="text-indigo-600 hover:text-indigo-700 text-sm">すべて見る →</a>
+                    </div>
+                    ${myIdeas.length === 0 ? `
+                        <div class="bg-white rounded-lg shadow p-8 text-center">
+                            <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                            <p class="text-gray-500 mb-4">まだアイディアを投稿していません</p>
+                            <a href="/post-idea" onclick="navigateTo('/post-idea'); return false;" 
+                               class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 inline-block">
+                                最初のアイディアを投稿
+                            </a>
+                        </div>
+                    ` : `
+                        <div class="grid gap-4">
+                            ${myIdeas.slice(0, 5).map(idea => `
+                                <div class="bg-white p-4 rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                                     onclick="navigateTo('/idea?id=${idea.id}')">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <h4 class="font-semibold">${idea.title}</h4>
+                                            <p class="text-sm text-gray-600 mt-1">${idea.description}</p>
+                                        </div>
+                                        <span class="bg-${idea.status === 'open' ? 'green' : idea.status === 'in_progress' ? 'yellow' : 'blue'}-100 
+                                                     text-${idea.status === 'open' ? 'green' : idea.status === 'in_progress' ? 'yellow' : 'blue'}-800 
+                                                     px-2 py-1 rounded text-sm">
+                                            ${idea.status === 'open' ? '募集中' : idea.status === 'in_progress' ? '開発中' : '完了'}
+                                        </span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'home');
+        setPageTitle('ホーム');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error in renderClientHome:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'home');
+        setPageTitle('ホーム');
+        setupLayoutEventListeners();
+    }
+}
+
+// 受信ボックスページ
+async function renderInbox() {
+    if (!state.token || state.user?.role !== 'client') {
+        navigateTo('/');
+        return;
+    }
+    
+    const content = `
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-2xl font-bold mb-4">受信ボックス</h2>
+                <p class="text-gray-600">通知機能は現在開発中です。</p>
+                <div class="mt-8 bg-gray-50 rounded-lg p-8 text-center">
+                    <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                    <p class="text-gray-500">新しい通知はありません</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('app').innerHTML = createLayout(content, 'inbox');
+    setPageTitle('受信ボックス');
+    setupLayoutEventListeners();
+}
+
+// 自分のアイディア一覧ページ
+async function renderMyIdeas() {
+    if (!state.token || state.user?.role !== 'client') {
+        navigateTo('/');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/ideas/my-ideas`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const ideas = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">自分のアイディア</h2>
+                        <a href="/post-idea" onclick="navigateTo('/post-idea'); return false;" 
+                           class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                            新しいアイディアを投稿
+                        </a>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <p>投稿したすべてのアイディアが表示されます（公開・非公開、ステータスに関わらず）</p>
+                    </div>
+                </div>
+                
+                ${ideas.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        <p class="text-gray-500 mb-4">まだアイディアを投稿していません</p>
+                        <a href="/post-idea" onclick="navigateTo('/post-idea'); return false;" 
+                           class="text-indigo-600 hover:text-indigo-700">最初のアイディアを投稿する</a>
+                    </div>
+                ` : `
+                    <div class="grid gap-4">
+                        ${ideas.map(idea => `
+                            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                                 onclick="navigateTo('/idea?id=${idea.id}')">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h3 class="text-xl font-semibold mb-2">${idea.title}</h3>
+                                        <p class="text-gray-600 mb-2">${idea.description}</p>
+                                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                                            <span class="bg-${idea.status === 'open' ? 'green' : idea.status === 'in_progress' ? 'yellow' : 'blue'}-100 
+                                                         text-${idea.status === 'open' ? 'green' : idea.status === 'in_progress' ? 'yellow' : 'blue'}-800 
+                                                         px-2 py-1 rounded">
+                                                ${idea.status === 'open' ? '募集中' : idea.status === 'in_progress' ? '開発中' : '完了'}
+                                            </span>
+                                            <span class="${idea.is_public ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} px-2 py-1 rounded">
+                                                ${idea.is_public ? '公開' : '非公開'}
+                                            </span>
+                                            <span>${new Date(idea.created_at).toLocaleDateString()}</span>
+                                            ${idea.pending_requests_count > 0 ? `
+                                                <span class="text-orange-600">
+                                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                                                    </svg>
+                                                    ${idea.pending_requests_count}件のリクエスト
+                                                </span>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                    ${idea.thumbnail_url ? `
+                                        <img src="${idea.thumbnail_url}" alt="${idea.title}" 
+                                             class="w-24 h-24 object-cover rounded ml-4">
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'my-ideas');
+        setPageTitle('自分のアイディア');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error fetching my ideas:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'my-ideas');
+        setPageTitle('エラー');
+        setupLayoutEventListeners();
+    }
+}
+
+// 進行中プロジェクトページ
+async function renderOngoingProjects() {
+    if (!state.token || state.user?.role !== 'client') {
+        navigateTo('/');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/ideas/my-ideas?status=in_progress`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const projects = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">進行中プロジェクト</h2>
+                
+                ${projects.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        <p class="text-gray-500">進行中のプロジェクトはありません</p>
+                    </div>
+                ` : `
+                    <div class="grid gap-4">
+                        ${projects.map(project => `
+                            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                                 onclick="navigateTo('/idea?id=${project.id}')">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="text-xl font-semibold mb-2">${project.title}</h3>
+                                        <p class="text-gray-600 mb-2">${project.description}</p>
+                                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">開発中</span>
+                                            <span>開始日: ${new Date(project.development_started_at).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                    ${project.activeDevelopment ? `
+                                        <button onclick="event.stopPropagation(); navigateTo('/development?id=${project.activeDevelopment.id}')" 
+                                                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                                            開発状況を見る
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'ongoing-projects');
+        setPageTitle('進行中プロジェクト');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error fetching ongoing projects:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'ongoing-projects');
+        setPageTitle('エラー');
+        setupLayoutEventListeners();
+    }
+}
+
+// 完了プロジェクトページ
+async function renderCompletedProjects() {
+    if (!state.token || state.user?.role !== 'client') {
+        navigateTo('/');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/ideas/my-ideas?status=delivered`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const projects = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">完了プロジェクト</h2>
+                
+                ${projects.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M12 2a10 10 0 100 20 10 10 0 000-20z"></path>
+                        </svg>
+                        <p class="text-gray-500">完了したプロジェクトはまだありません</p>
+                    </div>
+                ` : `
+                    <div class="grid gap-4">
+                        ${projects.map(project => `
+                            <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                                 onclick="navigateTo('/idea?id=${project.id}')">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="text-xl font-semibold mb-2">${project.title}</h3>
+                                        <p class="text-gray-600 mb-2">${project.description}</p>
+                                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">完了</span>
+                                            <span>完了日: ${project.development_completed_at ? new Date(project.development_completed_at).toLocaleDateString() : '不明'}</span>
+                                            ${project.budget ? `<span>予算: ¥${project.budget.toLocaleString()}</span>` : ''}
+                                        </div>
+                                    </div>
+                                    ${project.thumbnail_url ? `
+                                        <img src="${project.thumbnail_url}" alt="${project.title}" 
+                                             class="w-24 h-24 object-cover rounded ml-4">
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'completed-projects');
+        setPageTitle('完了プロジェクト');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error fetching completed projects:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'completed-projects');
+        setPageTitle('エラー');
+        setupLayoutEventListeners();
+    }
 }
 
 // グローバル関数として公開

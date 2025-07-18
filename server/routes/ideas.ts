@@ -35,6 +35,51 @@ router.get('/', (req, res) => {
   });
 });
 
+// 自分のアイディア一覧を取得（この位置に移動：/:idより前に配置）
+router.get('/my-ideas', authenticateToken, (req: AuthRequest, res) => {
+  const status = req.query.status;
+  
+  let query = `SELECT i.*, 
+     (SELECT COUNT(*) FROM development_requests dr 
+      WHERE dr.idea_id = i.id AND dr.status = 'pending') as pending_requests_count,
+     (SELECT COUNT(*) FROM development_requests dr 
+      WHERE dr.idea_id = i.id AND dr.status = 'in_progress') as active_requests_count,
+     (SELECT d.id FROM developments d 
+      WHERE d.idea_id = i.id AND d.status = 'started' 
+      ORDER BY d.created_at DESC LIMIT 1) as active_development_id,
+     (SELECT d.created_at FROM developments d 
+      WHERE d.idea_id = i.id AND d.status = 'started' 
+      ORDER BY d.created_at DESC LIMIT 1) as development_started_at
+     FROM ideas i 
+     WHERE i.user_id = ? AND i.deleted = 0`;
+  
+  const params = [req.user!.id];
+  
+  if (status) {
+    query += ` AND i.status = ?`;
+    params.push(status);
+  }
+  
+  query += ` ORDER BY i.created_at DESC`;
+  
+  db.all(query, params, (err, ideas) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    // activeDevelopmentオブジェクトを追加
+    const ideasWithDevelopment = ideas.map((idea: any) => ({
+      ...idea,
+      activeDevelopment: idea.active_development_id ? {
+        id: idea.active_development_id
+      } : null
+    }));
+    
+    res.json(ideasWithDevelopment);
+  });
+});
+
 // Get development requests for a specific idea
 router.get('/:id/requests', (req, res) => {
   const ideaId = req.params.id;
@@ -288,19 +333,6 @@ router.post('/', authenticateToken, (req: AuthRequest, res) => {
         is_public: true,
         created_at: new Date().toISOString()
       });
-    }
-  );
-});
-
-router.get('/my/ideas', authenticateToken, (req: AuthRequest, res) => {
-  db.all(
-    `SELECT * FROM ideas WHERE user_id = ? AND deleted = 0 ORDER BY created_at DESC`,
-    [req.user!.id],
-    (err, ideas) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(ideas);
     }
   );
 });
