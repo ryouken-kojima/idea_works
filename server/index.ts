@@ -8,6 +8,7 @@ import chatRouter from './routes/chat.js';
 import requestsRouter from './routes/requests.js';
 import dashboardRouter from './routes/dashboard.js';
 import developmentDetailRouter from './routes/development-detail.js';
+import developerProfilesRouter from './routes/developerProfiles.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/api/chat', chatRouter);
 app.use('/api/requests', requestsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/development-detail', developmentDetailRouter);
+app.use('/api/developer-profiles', developerProfilesRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

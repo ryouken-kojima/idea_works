@@ -104,7 +104,7 @@ router.put('/:id', authenticateToken, (req: AuthRequest, res) => {
   );
 });
 
-router.get('/my/developments', authenticateToken, (req: AuthRequest, res) => {
+router.get('/my-developments', authenticateToken, (req: AuthRequest, res) => {
   db.all(
     `SELECT d.*, i.title, i.description 
      FROM developments d
@@ -117,6 +117,46 @@ router.get('/my/developments', authenticateToken, (req: AuthRequest, res) => {
         return res.status(500).json({ error: 'Database error' });
       }
       res.json(developments);
+    }
+  );
+});
+
+router.get('/client-developments', authenticateToken, (req: AuthRequest, res) => {
+  db.all(
+    `SELECT d.*, i.title, i.description, u.username as developer_name
+     FROM developments d
+     JOIN ideas i ON d.idea_id = i.id
+     JOIN users u ON d.developer_id = u.id
+     WHERE i.user_id = ?
+     ORDER BY d.created_at DESC`,
+    [req.user!.id],
+    (err, developments) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json(developments);
+    }
+  );
+});
+
+router.get('/:id', authenticateToken, (req: AuthRequest, res) => {
+  db.get(
+    `SELECT d.*, i.title, i.description, i.user_id as client_id, 
+            u.username as developer_name, uc.username as client_name
+     FROM developments d
+     JOIN ideas i ON d.idea_id = i.id
+     JOIN users u ON d.developer_id = u.id
+     JOIN users uc ON i.user_id = uc.id
+     WHERE d.id = ?`,
+    [req.params.id],
+    (err, development) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!development) {
+        return res.status(404).json({ error: 'Development not found' });
+      }
+      res.json(development);
     }
   );
 });

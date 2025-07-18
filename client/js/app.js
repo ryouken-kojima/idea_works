@@ -1,3 +1,5 @@
+import { createLayout, setPageTitle, setupLayoutEventListeners } from './layout.js';
+
 const API_URL = 'http://localhost:3001/api';
 
 const state = {
@@ -16,7 +18,9 @@ const router = {
     '/chat': renderChat,
     '/requests': renderRequests,
     '/request': renderRequestDetail,
-    '/development': renderDevelopmentDetail
+    '/development': renderDevelopmentDetail,
+    '/developers': renderDevelopers,
+    '/profile-edit': () => window.location.href = '/profile-edit.html'
 };
 
 function navigateTo(path) {
@@ -28,62 +32,89 @@ function render() {
     const path = window.location.pathname;
     const handler = router[path] || renderHome;
     handler();
-    updateNav();
 }
 
-function updateNav() {
-    const navMenu = document.getElementById('nav-menu');
-    
-    if (state.token) {
-        navMenu.innerHTML = `
-            <a href="/dashboard" onclick="navigateTo('/dashboard'); return false;" class="text-gray-600 hover:text-indigo-600">ダッシュボード</a>
-            <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア一覧</a>
-            ${state.user?.role === 'client' ? '<a href="/post-idea" onclick="navigateTo(\'/post-idea\'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア投稿</a>' : ''}
-            <a href="/requests" onclick="navigateTo('/requests'); return false;" class="text-gray-600 hover:text-indigo-600">開発リクエスト</a>
-            <button onclick="logout()" class="text-red-600 hover:text-red-700">ログアウト</button>
-        `;
-    } else {
-        navMenu.innerHTML = `
-            <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
-            <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
-        `;
-    }
-}
 
 function renderHome() {
-    document.getElementById('main-content').innerHTML = `
-        <div class="max-w-4xl mx-auto text-center py-16">
-            <h2 class="text-4xl font-bold mb-6">アイディアを形にするMVP量産所</h2>
-            <p class="text-xl text-gray-600 mb-8">日常の困りごとを投稿して、ライブコーダーが即席で開発</p>
-            <div class="flex gap-4 justify-center">
-                <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg hover:bg-indigo-700">今すぐ始める</a>
-                <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="border border-indigo-600 text-indigo-600 px-8 py-3 rounded-lg text-lg hover:bg-indigo-50">アイディアを見る</a>
-            </div>
+    // ログインしている場合はダッシュボードにリダイレクト
+    if (state.token) {
+        navigateTo('/dashboard');
+        return;
+    }
+    
+    // ログインしていない場合のホームページ
+    document.getElementById('app').innerHTML = `
+        <div class="min-h-screen bg-gray-50">
+            <!-- Navigation -->
+            <nav class="bg-white shadow-sm">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex justify-between items-center">
+                        <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
+                        <div class="flex gap-4">
+                            <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア一覧</a>
+                            <a href="/developers" onclick="navigateTo('/developers'); return false;" class="text-gray-600 hover:text-indigo-600">開発者一覧</a>
+                            <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
+                            <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+            
+            <!-- Main Content -->
+            <main class="container mx-auto px-4 py-16">
+                <div class="max-w-4xl mx-auto text-center">
+                    <h2 class="text-4xl font-bold mb-6">アイディアを形にするMVP量産所</h2>
+                    <p class="text-xl text-gray-600 mb-8">日常の困りごとを投稿して、ライブコーダーが即席で開発</p>
+                    <div class="flex gap-4 justify-center">
+                        <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg hover:bg-indigo-700">今すぐ始める</a>
+                        <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="border border-indigo-600 text-indigo-600 px-8 py-3 rounded-lg text-lg hover:bg-indigo-50">アイディアを見る</a>
+                    </div>
+                </div>
+            </main>
         </div>
     `;
 }
 
 function renderLogin() {
-    document.getElementById('main-content').innerHTML = `
-        <div class="max-w-md mx-auto">
-            <h2 class="text-2xl font-bold mb-6">ログイン</h2>
-            <form onsubmit="handleLogin(event)">
-                <div class="mb-4">
-                    <label class="block text-gray-700 mb-2">メールアドレス</label>
-                    <input type="email" name="email" required class="w-full border rounded px-3 py-2">
+    // ログインページは従来のレイアウト
+    document.getElementById('app').innerHTML = `
+        <div class="min-h-screen bg-gray-50">
+            <!-- Navigation -->
+            <nav class="bg-white shadow-sm">
+                <div class="container mx-auto px-4 py-4">
+                    <div class="flex justify-between items-center">
+                        <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
+                        <div class="flex gap-4">
+                            <a href="/" onclick="navigateTo('/'); return false;" class="text-gray-600 hover:text-indigo-600">ホーム</a>
+                            <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-6">
-                    <label class="block text-gray-700 mb-2">パスワード</label>
-                    <input type="password" name="password" required class="w-full border rounded px-3 py-2">
+            </nav>
+            
+            <!-- Main Content -->
+            <main class="container mx-auto px-4 py-16">
+                <div class="max-w-md mx-auto">
+                    <h2 class="text-2xl font-bold mb-6">ログイン</h2>
+                    <form onsubmit="handleLogin(event)">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">メールアドレス</label>
+                            <input type="email" name="email" required class="w-full border rounded px-3 py-2">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">パスワード</label>
+                            <input type="password" name="password" required class="w-full border rounded px-3 py-2">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">ログイン</button>
+                    </form>
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">ログイン</button>
-            </form>
+            </main>
         </div>
     `;
 }
 
 function renderRegister() {
-    document.getElementById('main-content').innerHTML = `
+    const content = `
         <div class="max-w-md mx-auto">
             <h2 class="text-2xl font-bold mb-6">新規登録</h2>
             <form onsubmit="handleRegister(event)">
@@ -111,6 +142,10 @@ function renderRegister() {
             </form>
         </div>
     `;
+    
+    document.getElementById('app').innerHTML = createLayout(content, 'register');
+    setPageTitle('新規登録');
+    setupLayoutEventListeners();
 }
 
 async function renderDashboard() {
@@ -123,7 +158,15 @@ async function renderDashboard() {
         ? await renderClientDashboard()
         : await renderDeveloperDashboard();
     
-    document.getElementById('main-content').innerHTML = content;
+    document.getElementById('app').innerHTML = createLayout(content, 'dashboard');
+    setPageTitle('ダッシュボード');
+    setupLayoutEventListeners();
+    
+    // ユーザー情報をlocalStorageに保存（レイアウトで使用）
+    if (state.user) {
+        localStorage.setItem('user', JSON.stringify(state.user));
+        localStorage.setItem('userRole', state.user.role);
+    }
 }
 
 async function renderClientDashboard() {
@@ -272,7 +315,7 @@ async function renderIdeas() {
         const response = await fetch(`${API_URL}/ideas`);
         const ideas = await response.json();
         
-        document.getElementById('main-content').innerHTML = `
+        const content = `
             <div class="container mx-auto px-4">
                 <h2 class="text-3xl font-bold mb-8 text-center">公開アイディア一覧</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -335,8 +378,42 @@ async function renderIdeas() {
                 ` : ''}
             </div>
         `;
+        
+        if (state.token) {
+            document.getElementById('app').innerHTML = createLayout(content, 'ideas');
+            setPageTitle('アイディア一覧');
+            setupLayoutEventListeners();
+        } else {
+            // ログインしていない場合は通常のレイアウト
+            document.getElementById('app').innerHTML = `
+                <div class="min-h-screen bg-gray-50">
+                    <!-- Navigation -->
+                    <nav class="bg-white shadow-sm">
+                        <div class="container mx-auto px-4 py-4">
+                            <div class="flex justify-between items-center">
+                                <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
+                                <div class="flex gap-4">
+                                    <a href="/" onclick="navigateTo('/'); return false;" class="text-gray-600 hover:text-indigo-600">ホーム</a>
+                                    <a href="/developers" onclick="navigateTo('/developers'); return false;" class="text-gray-600 hover:text-indigo-600">開発者一覧</a>
+                                    <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
+                                    <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+                    <main>
+                        ${content}
+                    </main>
+                </div>
+            `;
+        }
     } catch (error) {
-        document.getElementById('main-content').innerHTML = '<p>エラーが発生しました</p>';
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        if (state.token) {
+            document.getElementById('app').innerHTML = createLayout(errorContent, 'ideas');
+        } else {
+            document.getElementById('app').innerHTML = errorContent;
+        }
     }
 }
 
@@ -346,7 +423,7 @@ function renderPostIdea() {
         return;
     }
 
-    document.getElementById('main-content').innerHTML = `
+    const content = `
         <div class="max-w-2xl mx-auto">
             <h2 class="text-2xl font-bold mb-6">アイディアを投稿</h2>
             <form onsubmit="handlePostIdea(event)">
@@ -382,6 +459,10 @@ function renderPostIdea() {
             </form>
         </div>
     `;
+    
+    document.getElementById('app').innerHTML = createLayout(content, 'post-idea');
+    setPageTitle('アイディア投稿');
+    setupLayoutEventListeners();
 }
 
 async function renderChat() {
@@ -394,7 +475,10 @@ async function renderChat() {
     }
     
     if (!ideaId) {
-        document.getElementById('main-content').innerHTML = '<p>アイデアが指定されていません</p>';
+        const errorContent = '<p>アイデアが指定されていません</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'chat');
+        setPageTitle('チャット');
+        setupLayoutEventListeners();
         return;
     }
     
@@ -419,7 +503,7 @@ async function renderChat() {
         
         const chatMessages = messagesResponse.ok ? await messagesResponse.json() : [];
         
-        document.getElementById('main-content').innerHTML = `
+        const chatContent = `
             <div class="max-w-4xl mx-auto">
                 <div class="bg-white rounded-lg shadow-lg h-[calc(100vh-200px)] flex flex-col">
                     <!-- ヘッダー -->
@@ -497,6 +581,11 @@ async function renderChat() {
             </div>
         `;
         
+        // レイアウトを適用
+        document.getElementById('app').innerHTML = createLayout(chatContent, 'chat');
+        setPageTitle(`チャット - ${idea.title}`);
+        setupLayoutEventListeners();
+        
         // メッセージエリアを最下部にスクロール
         const messagesDiv = document.getElementById('chat-messages');
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -537,7 +626,10 @@ async function renderChat() {
         }, 3000); // 3秒ごとに更新
         
     } catch (error) {
-        document.getElementById('main-content').innerHTML = '<p>エラーが発生しました</p>';
+        const errorContent = '<p>エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'chat');
+        setPageTitle('チャット');
+        setupLayoutEventListeners();
     }
 }
 
@@ -546,7 +638,11 @@ async function renderIdeaDetail() {
     const ideaId = urlParams.get('id');
     
     if (!ideaId) {
-        document.getElementById('main-content').innerHTML = '<p>アイディアが見つかりません</p>';
+        const errorContent = '<p class="text-center text-red-600">アイディアが見つかりません</p>';
+        document.getElementById('app').innerHTML = state.token 
+            ? createLayout(errorContent, 'ideas')
+            : errorContent;
+        if (state.token) setupLayoutEventListeners();
         return;
     }
     
@@ -562,7 +658,7 @@ async function renderIdeaDetail() {
         const isOwner = state.user && state.user.id === idea.user_id;
         const isDeveloper = state.user && state.user.role === 'developer';
         
-        document.getElementById('main-content').innerHTML = `
+        const content = `
             <div class="max-w-4xl mx-auto">
                 <div class="bg-white p-6 rounded shadow">
                     <div class="flex justify-between items-start mb-4">
@@ -757,8 +853,19 @@ async function renderIdeaDetail() {
                 ` : ''}
             </div>
         `;
+        
+        document.getElementById('app').innerHTML = state.token 
+            ? createLayout(content, 'ideas')
+            : content;
+        setPageTitle(idea.title);
+        if (state.token) setupLayoutEventListeners();
     } catch (error) {
-        document.getElementById('main-content').innerHTML = '<p>エラーが発生しました</p>';
+        console.error('Error in renderIdeaDetail:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = state.token 
+            ? createLayout(errorContent, 'ideas')
+            : errorContent;
+        if (state.token) setupLayoutEventListeners();
     }
 }
 
@@ -781,6 +888,8 @@ async function handleLogin(event) {
             state.token = data.token;
             state.user = data.user;
             localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('userRole', data.user.role);
             navigateTo('/dashboard');
         } else {
             alert(data.error);
@@ -811,6 +920,8 @@ async function handleRegister(event) {
             state.token = data.token;
             state.user = data.user;
             localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('userRole', data.user.role);
             navigateTo('/dashboard');
         } else {
             alert(data.error);
@@ -913,6 +1024,8 @@ function logout() {
     state.token = null;
     state.user = null;
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userRole');
     navigateTo('/');
 }
 
@@ -1378,7 +1491,7 @@ async function renderRequests() {
 
         const requests = await response.json();
 
-        document.getElementById('main-content').innerHTML = `
+        const content = `
             <div class="max-w-6xl mx-auto">
                 <h2 class="text-2xl font-bold mb-6">開発リクエスト</h2>
                 
@@ -1411,9 +1524,15 @@ async function renderRequests() {
                 </div>
             </div>
         `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'requests');
+        setPageTitle('開発リクエスト');
+        setupLayoutEventListeners();
     } catch (error) {
         console.error('Error fetching requests:', error);
-        document.getElementById('main-content').innerHTML = '<p>エラーが発生しました</p>';
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'requests');
+        setupLayoutEventListeners();
     }
 }
 
@@ -1446,7 +1565,7 @@ async function renderRequestDetail() {
         const isClient = state.user.id === request.client_id;
         const isDeveloper = state.user.role === 'developer';
 
-        document.getElementById('main-content').innerHTML = `
+        const requestDetailContent = `
             <div class="max-w-4xl mx-auto">
                 <div class="bg-white p-6 rounded shadow mb-6">
                     <h2 class="text-2xl font-bold mb-4">${request.title}</h2>
@@ -1525,6 +1644,11 @@ async function renderRequestDetail() {
                 </div>
             </div>
         `;
+        
+        // レイアウトを適用
+        document.getElementById('app').innerHTML = createLayout(requestDetailContent, 'requests');
+        setPageTitle(`リクエスト詳細 - ${request.title}`);
+        setupLayoutEventListeners();
     } catch (error) {
         console.error('Error:', error);
         navigateTo('/requests');
@@ -1771,7 +1895,7 @@ async function renderDevelopmentDetail() {
         const isClient = state.user.id === development.client_id;
         const isDeveloper = state.user.id === development.developer_id;
 
-        document.getElementById('main-content').innerHTML = `
+        const content = `
             <div class="max-w-6xl mx-auto">
                 <div class="bg-white p-6 rounded shadow mb-6">
                     <h2 class="text-2xl font-bold mb-4">${development.idea_title}</h2>
@@ -1837,9 +1961,16 @@ async function renderDevelopmentDetail() {
                 </div>
             </div>
         `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'development');
+        setPageTitle(`開発進捗: ${development.idea_title}`);
+        setupLayoutEventListeners();
     } catch (error) {
-        console.error('Error:', error);
-        navigateTo('/dashboard');
+        console.error('Error in renderDevelopmentDetail:', error);
+        const errorContent = '<p class="text-center text-red-600">エラーが発生しました</p>';
+        document.getElementById('app').innerHTML = createLayout(errorContent, 'development');
+        setPageTitle('エラー');
+        setupLayoutEventListeners();
     }
 }
 
@@ -2007,6 +2138,283 @@ window.createThread = createThread;
 window.showThreadMessages = showThreadMessages;
 window.sendThreadMessage = sendThreadMessage;
 
+// 開発者一覧ページ
+async function renderDevelopers() {
+    let allSpecializations = [];
+    let allLanguages = [];
+    
+    // フィルターオプションを読み込む
+    async function loadFilterOptions() {
+        try {
+            const specResponse = await fetch(`${API_URL}/developer-profiles/specializations`);
+            allSpecializations = await specResponse.json();
+            
+            const langResponse = await fetch(`${API_URL}/developer-profiles/languages`);
+            allLanguages = await langResponse.json();
+        } catch (error) {
+            console.error('フィルターオプションの読み込みエラー:', error);
+        }
+    }
+    
+    // 開発者を検索する
+    async function searchDevelopers() {
+        const params = new URLSearchParams();
+        
+        const skill = document.getElementById('skillFilter')?.value || '';
+        const specialization = document.getElementById('specializationFilter')?.value || '';
+        const language = document.getElementById('languageFilter')?.value || '';
+        const minRate = document.getElementById('minRateFilter')?.value || '';
+        const maxRate = document.getElementById('maxRateFilter')?.value || '';
+
+        if (skill) params.append('skill', skill);
+        if (specialization) params.append('specialization', specialization);
+        if (language) params.append('language', language);
+        if (minRate) params.append('minRate', minRate);
+        if (maxRate) params.append('maxRate', maxRate);
+
+        try {
+            const response = await fetch(`${API_URL}/developer-profiles/search?${params}`);
+            const developers = await response.json();
+            
+            const developersContainer = document.getElementById('developersContainer');
+            if (!developersContainer) return;
+
+            if (developers.length === 0) {
+                developersContainer.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">該当する開発者が見つかりませんでした</p>
+                    </div>
+                `;
+                return;
+            }
+
+            developersContainer.innerHTML = developers.map(dev => renderDeveloperCard(dev)).join('');
+        } catch (error) {
+            console.error('開発者の検索エラー:', error);
+        }
+    }
+    
+    // 開発者カードを描画
+    function renderDeveloperCard(dev) {
+        return `
+            <div class="bg-white rounded-lg shadow hover:shadow-lg transition cursor-pointer" 
+                 onclick="window.location.href='/developer-profile.html?id=${dev.id}'">
+                <div class="p-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center">
+                            ${dev.profile_image_url ? 
+                                `<img src="${dev.profile_image_url}" alt="${dev.username}" class="w-12 h-12 rounded-full mr-3">` :
+                                `<div class="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center">
+                                    <i class="fas fa-user text-gray-400"></i>
+                                </div>`
+                            }
+                            <div>
+                                <h3 class="font-semibold text-gray-800">${dev.username}</h3>
+                                <p class="text-sm text-gray-600">経験${dev.years_of_experience || 0}年</p>
+                            </div>
+                        </div>
+                        ${dev.available_for_hire ? 
+                            '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">受注可能</span>' :
+                            '<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">受注不可</span>'
+                        }
+                    </div>
+                    
+                    ${dev.bio ? `
+                        <p class="text-sm text-gray-700 mb-4" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${dev.bio}</p>
+                    ` : ''}
+                    
+                    <div class="space-y-2">
+                        ${dev.hourly_rate ? `
+                            <div class="flex items-center text-sm">
+                                <i class="fas fa-clock text-gray-400 mr-2"></i>
+                                <span class="text-gray-600">時給: </span>
+                                <span class="font-medium ml-1">¥${dev.hourly_rate.toLocaleString()}</span>
+                            </div>
+                        ` : ''}
+                        
+                        ${dev.project_rate ? `
+                            <div class="flex items-center text-sm">
+                                <i class="fas fa-project-diagram text-gray-400 mr-2"></i>
+                                <span class="text-gray-600">プロジェクト: </span>
+                                <span class="font-medium ml-1">¥${dev.project_rate.toLocaleString()}〜</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t">
+                        <a href="/developer-profile.html?id=${dev.id}" 
+                           class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                            プロフィールを見る <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    await loadFilterOptions();
+    
+    const content = `
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">開発者を探す</h2>
+                
+                <!-- 検索フィルター -->
+                <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">スキル</label>
+                            <input type="text" id="skillFilter" placeholder="例: React, Python"
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">専門分野</label>
+                            <select id="specializationFilter" class="w-full border-gray-300 rounded-md shadow-sm">
+                                <option value="">すべて</option>
+                                ${allSpecializations.map(spec => 
+                                    `<option value="${spec.name}">${spec.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">対応言語</label>
+                            <select id="languageFilter" class="w-full border-gray-300 rounded-md shadow-sm">
+                                <option value="">すべて</option>
+                                ${allLanguages.map(lang => 
+                                    `<option value="${lang.name}">${lang.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="searchDevelopers()" 
+                                class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700">
+                                <i class="fas fa-search mr-2"></i>検索
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">最低時給（円）</label>
+                            <input type="number" id="minRateFilter" placeholder="例: 3000"
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">最高時給（円）</label>
+                            <input type="number" id="maxRateFilter" placeholder="例: 10000"
+                                class="w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 開発者リスト -->
+            <div id="developersContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- ローディング表示 -->
+                <div class="col-span-full flex justify-center py-12">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (state.token) {
+        document.getElementById('app').innerHTML = createLayout(content, 'developers');
+        setPageTitle('開発者を探す');
+        setupLayoutEventListeners();
+    } else {
+        // ログインしていない場合は通常のレイアウト
+        document.getElementById('app').innerHTML = `
+            <div class="min-h-screen bg-gray-50">
+                <!-- Navigation -->
+                <nav class="bg-white shadow-sm">
+                    <div class="container mx-auto px-4 py-4">
+                        <div class="flex justify-between items-center">
+                            <h1 class="text-2xl font-bold text-indigo-600">IdeaWorks</h1>
+                            <div class="flex gap-4">
+                                <a href="/" onclick="navigateTo('/'); return false;" class="text-gray-600 hover:text-indigo-600">ホーム</a>
+                                <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア一覧</a>
+                                <a href="/login" onclick="navigateTo('/login'); return false;" class="text-gray-600 hover:text-indigo-600">ログイン</a>
+                                <a href="/register" onclick="navigateTo('/register'); return false;" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">新規登録</a>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+                <main class="container mx-auto px-4 py-8">
+                    ${content}
+                </main>
+            </div>
+        `;
+    }
+    
+    // グローバルに関数を公開
+    window.searchDevelopers = searchDevelopers;
+    
+    // 初期検索を実行
+    setTimeout(() => searchDevelopers(), 100);
+}
+
+// グローバル関数として公開
+window.logout = function() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userRole');
+    state.token = null;
+    state.user = null;
+    window.location.href = '/';
+};
+
+// デバッグ用：window関数の確認
+console.log('Window functions check:');
+console.log('navigateTo:', typeof window.navigateTo);
+console.log('generateThumbnail:', typeof window.generateThumbnail);
+console.log('deleteIdea:', typeof window.deleteIdea);
+
+// グローバルクリックイベントハンドラー（デリゲーション）
+document.addEventListener('click', function(event) {
+    // aタグのonclick処理
+    const anchor = event.target.closest('a[onclick]');
+    if (anchor) {
+        event.preventDefault();
+        const onclickAttr = anchor.getAttribute('onclick');
+        try {
+            eval(onclickAttr);
+        } catch (error) {
+            console.error('Error executing onclick:', error, onclickAttr);
+        }
+    }
+    
+    // buttonタグのonclick処理
+    const button = event.target.closest('button[onclick]');
+    if (button && !anchor) {
+        const onclickAttr = button.getAttribute('onclick');
+        try {
+            eval(onclickAttr);
+        } catch (error) {
+            console.error('Error executing onclick:', error, onclickAttr);
+        }
+    }
+    
+    // divタグのonclick処理
+    const div = event.target.closest('div[onclick]');
+    if (div && !anchor && !button) {
+        const onclickAttr = div.getAttribute('onclick');
+        try {
+            eval(onclickAttr);
+        } catch (error) {
+            console.error('Error executing onclick:', error, onclickAttr);
+        }
+    }
+});
+
 window.addEventListener('popstate', render);
-checkAuth();
-render();
+checkAuth().then(() => {
+    render();
+    // 初回レンダリング後の関数チェック
+    setTimeout(() => {
+        console.log('Functions available after render:');
+        console.log('navigateTo:', typeof window.navigateTo);
+        console.log('All window functions:', Object.keys(window).filter(key => typeof window[key] === 'function' && key.includes('navigate')));
+    }, 1000);
+});
