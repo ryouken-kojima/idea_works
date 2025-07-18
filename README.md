@@ -10,12 +10,26 @@
 npm install
 ```
 
-### 2. データベースの初期化
+### 2. 環境変数の設定
+`.env.example`をコピーして`.env`ファイルを作成し、必要な値を設定します。
+
+```bash
+cp .env.example .env
+```
+
+`.env`ファイルを編集：
+```
+JWT_SECRET=your-secret-key-here
+OPENAI_API_KEY=sk-your-openai-api-key-here  # OpenAI APIキー（AI要件定義生成に必要）
+PORT=4000
+```
+
+### 3. データベースの初期化
 ```bash
 cd database && node --import tsx init.ts
 ```
 
-### 3. サーバーの起動
+### 4. サーバーの起動
 ```bash
 npm run dev
 ```
@@ -28,8 +42,9 @@ npm run dev
 ### 依頼者として
 1. 新規登録で「依頼者」を選択
 2. アイディアを投稿
-3. 開発者が開発完了するまで待つ
-4. 成果物を受け取る
+3. AI機能を使って要件定義を自動生成（編集可能）
+4. 開発者が開発完了するまで待つ
+5. 成果物を受け取る
 
 ### 開発者として
 1. 新規登録で「開発者」を選択
@@ -42,3 +57,10 @@ npm run dev
 - バックエンド: Node.js + Express + TypeScript
 - データベース: SQLite
 - 認証: JWT
+- AI: OpenAI API (GPT-4)
+
+## 主な機能
+- アイディア投稿・管理
+- AI要件定義生成（依頼者の曖昧な要望を具体的な要件定義に変換）
+- 開発着手・成果物提出
+- ステータス管理

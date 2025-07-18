@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('client', 'developer')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -14,8 +15,12 @@ CREATE TABLE IF NOT EXISTS ideas (
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     budget INTEGER,
-    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'completed')),
+    thumbnail TEXT,
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'delivered', 'completed')),
+    is_public BOOLEAN DEFAULT 1,
+    deleted BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -31,6 +36,9 @@ CREATE TABLE IF NOT EXISTS developments (
     FOREIGN KEY (idea_id) REFERENCES ideas(id),
     FOREIGN KEY (developer_id) REFERENCES users(id)
 );
+
+-- Add requirements column to ideas table
+ALTER TABLE ideas ADD COLUMN requirements TEXT;
 
 -- Indexes
 CREATE INDEX idx_ideas_user_id ON ideas(user_id);

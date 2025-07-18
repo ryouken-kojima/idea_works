@@ -1,33 +1,41 @@
 import { Router } from 'express';
 import db from '../utils/db.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { generateRequirements } from '../utils/openai.js';
 
 const router = Router();
 
 router.get('/', (req, res) => {
-  const status = req.query.status || 'open';
+  const status = req.query.status;
   
-  db.all(
-    `SELECT i.*, u.email as user_email 
+  let query = `SELECT i.*, u.username, u.email as user_email 
      FROM ideas i 
      JOIN users u ON i.user_id = u.id 
-     WHERE i.status = ? 
-     ORDER BY i.created_at DESC`,
-    [status],
-    (err, ideas) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(ideas);
+     WHERE i.deleted = 0 AND i.is_public = 1`;
+  
+  const params = [];
+  
+  if (status) {
+    query += ` AND i.status = ?`;
+    params.push(status);
+  }
+  
+  query += ` ORDER BY i.created_at DESC`;
+  
+  db.all(query, params, (err, ideas) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
     }
-  );
+    res.json(ideas);
+  });
 });
 
 router.get('/:id', (req, res) => {
   db.get(
-    `SELECT i.*, u.email as user_email,
+    `SELECT i.*, u.username, u.email as user_email,
             d.id as development_id, d.status as development_status,
-            d.deliverable_url, dev.email as developer_email
+            d.deliverable_url, dev.username as developer_username, dev.email as developer_email
      FROM ideas i 
      JOIN users u ON i.user_id = u.id
      LEFT JOIN developments d ON i.id = d.idea_id
@@ -46,20 +54,186 @@ router.get('/:id', (req, res) => {
   );
 });
 
+// Generate AI requirements for an idea
+router.post('/:id/generate-requirements', authenticateToken, async (req: AuthRequest, res) => {
+  const ideaId = req.params.id;
+  
+  // Check if user owns the idea
+  db.get(
+    'SELECT * FROM ideas WHERE id = ? AND user_id = ?',
+    [ideaId, req.user!.id],
+    async (err, idea: any) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!idea) {
+        return res.status(404).json({ error: 'Idea not found or unauthorized' });
+      }
+      
+      try {
+        // OpenAI APIを使用して要件定義を生成
+        const generatedRequirements = await generateRequirements(
+          idea.title,
+          idea.description,
+          idea.budget
+        );
+        
+        res.json({ requirements: generatedRequirements });
+      } catch (error) {
+        console.error('Error generating requirements:', error);
+        res.status(500).json({ 
+          error: error instanceof Error ? error.message : 'Failed to generate requirements',
+          details: 'OpenAI APIキーが設定されていない可能性があります。.envファイルにOPENAI_API_KEYを設定してください。'
+        });
+      }
+    }
+  );
+});
+
+// Generate AI thumbnail from title (no idea ID required)
+router.post('/generate-thumbnail', authenticateToken, async (req: AuthRequest, res) => {
+  const { title } = req.body;
+  
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+  
+  try {
+    // Generate thumbnail URL using OpenAI DALL-E
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: `A professional, modern thumbnail image for: ${title}. Style: clean, minimalist, tech-oriented, suitable for a web application showcase.`,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard',
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`DALL-E API error: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const thumbnailUrl = data.data[0].url;
+    
+    res.json({ thumbnail: thumbnailUrl });
+  } catch (error) {
+    console.error('Error generating thumbnail:', error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : 'Failed to generate thumbnail',
+      details: 'DALL-E API error or configuration issue'
+    });
+  }
+});
+
+// Generate AI thumbnail for an idea
+router.post('/:id/generate-thumbnail', authenticateToken, async (req: AuthRequest, res) => {
+  const ideaId = req.params.id;
+  
+  // Check if user owns the idea
+  db.get(
+    'SELECT * FROM ideas WHERE id = ? AND user_id = ?',
+    [ideaId, req.user!.id],
+    async (err, idea: any) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!idea) {
+        return res.status(404).json({ error: 'Idea not found or unauthorized' });
+      }
+      
+      try {
+        // Generate thumbnail URL using OpenAI DALL-E
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'dall-e-3',
+            prompt: `A professional, modern thumbnail image for: ${idea.title}. Style: clean, minimalist, tech-oriented, suitable for a web application showcase.`,
+            n: 1,
+            size: '1024x1024',
+            quality: 'standard',
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`DALL-E API error: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const thumbnailUrl = data.data[0].url;
+        
+        res.json({ thumbnail: thumbnailUrl });
+      } catch (error) {
+        console.error('Error generating thumbnail:', error);
+        res.status(500).json({ 
+          error: error instanceof Error ? error.message : 'Failed to generate thumbnail',
+          details: 'DALL-E API error or configuration issue'
+        });
+      }
+    }
+  );
+});
+
+// Update requirements for an idea
+router.put('/:id/requirements', authenticateToken, (req: AuthRequest, res) => {
+  const { requirements } = req.body;
+  const ideaId = req.params.id;
+  
+  if (!requirements) {
+    return res.status(400).json({ error: 'Requirements are required' });
+  }
+  
+  // Check if user owns the idea
+  db.get(
+    'SELECT * FROM ideas WHERE id = ? AND user_id = ?',
+    [ideaId, req.user!.id],
+    (err, idea) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!idea) {
+        return res.status(404).json({ error: 'Idea not found or unauthorized' });
+      }
+      
+      // Update requirements
+      db.run(
+        'UPDATE ideas SET requirements = ? WHERE id = ?',
+        [requirements, ideaId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Failed to update requirements' });
+          }
+          res.json({ success: true, requirements });
+        }
+      );
+    }
+  );
+});
+
 router.post('/', authenticateToken, (req: AuthRequest, res) => {
   if (req.user?.role !== 'client') {
     return res.status(403).json({ error: 'Only clients can post ideas' });
   }
 
-  const { title, description, budget } = req.body;
+  const { title, description, budget, thumbnail } = req.body;
 
   if (!title || !description) {
     return res.status(400).json({ error: 'Title and description required' });
   }
 
   db.run(
-    'INSERT INTO ideas (user_id, title, description, budget) VALUES (?, ?, ?, ?)',
-    [req.user.id, title, description, budget || null],
+    'INSERT INTO ideas (user_id, title, description, budget, thumbnail, status, is_public) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [req.user.id, title, description, budget || null, thumbnail || null, 'open', 1],
     function(err) {
       if (err) {
         return res.status(500).json({ error: 'Database error' });
@@ -70,7 +244,9 @@ router.post('/', authenticateToken, (req: AuthRequest, res) => {
         title, 
         description, 
         budget,
+        thumbnail,
         status: 'open',
+        is_public: true,
         created_at: new Date().toISOString()
       });
     }
@@ -79,13 +255,132 @@ router.post('/', authenticateToken, (req: AuthRequest, res) => {
 
 router.get('/my/ideas', authenticateToken, (req: AuthRequest, res) => {
   db.all(
-    `SELECT * FROM ideas WHERE user_id = ? ORDER BY created_at DESC`,
+    `SELECT * FROM ideas WHERE user_id = ? AND deleted = 0 ORDER BY created_at DESC`,
     [req.user!.id],
     (err, ideas) => {
       if (err) {
         return res.status(500).json({ error: 'Database error' });
       }
       res.json(ideas);
+    }
+  );
+});
+
+// Update thumbnail for an idea
+router.put('/:id/thumbnail', authenticateToken, (req: AuthRequest, res) => {
+  const { thumbnail } = req.body;
+  const ideaId = req.params.id;
+  
+  if (!thumbnail) {
+    return res.status(400).json({ error: 'Thumbnail URL is required' });
+  }
+  
+  // Check if user owns the idea
+  db.get(
+    'SELECT * FROM ideas WHERE id = ? AND user_id = ?',
+    [ideaId, req.user!.id],
+    (err, idea) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!idea) {
+        return res.status(404).json({ error: 'Idea not found or unauthorized' });
+      }
+      
+      // Update thumbnail
+      db.run(
+        'UPDATE ideas SET thumbnail = ?, updated_at = ? WHERE id = ?',
+        [thumbnail, new Date().toISOString(), ideaId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Failed to update thumbnail' });
+          }
+          res.json({ success: true, thumbnail });
+        }
+      );
+    }
+  );
+});
+
+// Update idea visibility and budget
+router.put('/:id', authenticateToken, (req: AuthRequest, res) => {
+  const { is_public, budget } = req.body;
+  const ideaId = req.params.id;
+  
+  // Check if user owns the idea
+  db.get(
+    'SELECT * FROM ideas WHERE id = ? AND user_id = ?',
+    [ideaId, req.user!.id],
+    (err, idea) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!idea) {
+        return res.status(404).json({ error: 'Idea not found or unauthorized' });
+      }
+      
+      const updates: string[] = [];
+      const values: any[] = [];
+      
+      if (is_public !== undefined) {
+        updates.push('is_public = ?');
+        values.push(is_public ? 1 : 0);
+      }
+      
+      if (budget !== undefined) {
+        updates.push('budget = ?');
+        values.push(budget);
+      }
+      
+      if (updates.length === 0) {
+        return res.status(400).json({ error: 'No updates provided' });
+      }
+      
+      updates.push('updated_at = ?');
+      values.push(new Date().toISOString());
+      
+      values.push(ideaId);
+      
+      db.run(
+        `UPDATE ideas SET ${updates.join(', ')} WHERE id = ?`,
+        values,
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Failed to update idea' });
+          }
+          res.json({ success: true });
+        }
+      );
+    }
+  );
+});
+
+// Delete idea (soft delete)
+router.delete('/:id', authenticateToken, (req: AuthRequest, res) => {
+  const ideaId = req.params.id;
+  
+  // Check if user owns the idea
+  db.get(
+    'SELECT * FROM ideas WHERE id = ? AND user_id = ?',
+    [ideaId, req.user!.id],
+    (err, idea) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!idea) {
+        return res.status(404).json({ error: 'Idea not found or unauthorized' });
+      }
+      
+      db.run(
+        'UPDATE ideas SET deleted = 1, updated_at = ? WHERE id = ?',
+        [new Date().toISOString(), ideaId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Failed to delete idea' });
+          }
+          res.json({ success: true });
+        }
+      );
     }
   );
 });

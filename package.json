@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npm run dev:server & npm run dev:client",
     "dev:server": "node --import tsx server/index.ts",
-    "dev:client": "cd client && python3 -m http.server 3000",
+    "dev:client": "cd client && python3 server.py",
     "build": "tsc"
   },
   "keywords": [],
@@ -19,6 +19,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
+    "openai": "^5.10.1",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {

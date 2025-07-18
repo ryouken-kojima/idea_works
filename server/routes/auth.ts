@@ -6,9 +6,9 @@ import db from '../utils/db.js';
 const router = Router();
 
 router.post('/register', async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, username, password, role } = req.body;
 
-  if (!email || !password || !role) {
+  if (!email || !username || !password || !role) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
@@ -20,8 +20,8 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     db.run(
-      'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
-      [email, hashedPassword, role],
+      'INSERT INTO users (email, username, password, role) VALUES (?, ?, ?, ?)',
+      [email, username, hashedPassword, role],
       function(err) {
         if (err) {
           if (err.message.includes('UNIQUE')) {
@@ -31,12 +31,12 @@ router.post('/register', async (req, res) => {
         }
         
         const token = jwt.sign(
-          { id: this.lastID, email, role },
+          { id: this.lastID, email, username, role },
           process.env.JWT_SECRET!,
           { expiresIn: '7d' }
         );
         
-        res.json({ token, user: { id: this.lastID, email, role } });
+        res.json({ token, user: { id: this.lastID, email, username, role } });
       }
     );
   } catch (error) {
@@ -69,14 +69,14 @@ router.post('/login', (req, res) => {
       }
       
       const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, username: user.username, role: user.role },
         process.env.JWT_SECRET!,
         { expiresIn: '7d' }
       );
       
       res.json({ 
         token, 
-        user: { id: user.id, email: user.email, role: user.role } 
+        user: { id: user.id, email: user.email, username: user.username, role: user.role } 
       });
     }
   );

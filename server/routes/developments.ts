@@ -16,7 +16,7 @@ router.post('/', authenticateToken, (req: AuthRequest, res) => {
   }
 
   db.get(
-    'SELECT * FROM ideas WHERE id = ? AND status = ?',
+    'SELECT * FROM ideas WHERE id = ? AND status = ? AND is_public = 1',
     [idea_id, 'open'],
     (err, idea) => {
       if (err) {
@@ -86,7 +86,7 @@ router.put('/:id', authenticateToken, (req: AuthRequest, res) => {
 
           db.run(
             'UPDATE ideas SET status = ? WHERE id = ?',
-            ['completed', development.idea_id],
+            ['delivered', development.idea_id],
             (err) => {
               if (err) {
                 return res.status(500).json({ error: 'Database error' });
