@@ -20,7 +20,28 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Database connection error:', err);
   } else {
     console.log('Connected to SQLite database');
+    initializeChatTables();
   }
 });
+
+function initializeChatTables() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      idea_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (idea_id) REFERENCES ideas(id),
+      FOREIGN KEY (sender_id) REFERENCES users(id)
+    )
+  `, (err) => {
+    if (err) {
+      console.error('Failed to create messages table:', err);
+    } else {
+      console.log('Messages table ready');
+    }
+  });
+}
 
 export default db;

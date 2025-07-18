@@ -8,7 +8,11 @@ const router = Router();
 router.get('/', (req, res) => {
   const status = req.query.status;
   
-  let query = `SELECT i.*, u.username, u.email as user_email 
+  let query = `SELECT i.*, u.username, u.email as user_email,
+     (SELECT COUNT(*) FROM development_requests dr 
+      WHERE dr.idea_id = i.id AND dr.status = 'pending') as pending_requests_count,
+     (SELECT COUNT(*) FROM development_requests dr 
+      WHERE dr.idea_id = i.id AND dr.status = 'in_progress') as active_requests_count
      FROM ideas i 
      JOIN users u ON i.user_id = u.id 
      WHERE i.deleted = 0 AND i.is_public = 1`;
@@ -31,11 +35,36 @@ router.get('/', (req, res) => {
   });
 });
 
+// Get development requests for a specific idea
+router.get('/:id/requests', (req, res) => {
+  const ideaId = req.params.id;
+  
+  db.all(
+    `SELECT dr.*, u.username as developer_username, u.email as developer_email
+     FROM development_requests dr
+     JOIN users u ON dr.developer_id = u.id
+     WHERE dr.idea_id = ?
+     ORDER BY dr.created_at DESC`,
+    [ideaId],
+    (err, requests) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json(requests);
+    }
+  );
+});
+
 router.get('/:id', (req, res) => {
   db.get(
     `SELECT i.*, u.username, u.email as user_email,
             d.id as development_id, d.status as development_status,
-            d.deliverable_url, dev.username as developer_username, dev.email as developer_email
+            d.deliverable_url, dev.username as developer_username, dev.email as developer_email,
+            (SELECT COUNT(*) FROM development_requests dr 
+             WHERE dr.idea_id = i.id AND dr.status = 'pending') as pending_requests_count,
+            (SELECT COUNT(*) FROM development_requests dr 
+             WHERE dr.idea_id = i.id AND dr.status = 'in_progress') as active_requests_count
      FROM ideas i 
      JOIN users u ON i.user_id = u.id
      LEFT JOIN developments d ON i.id = d.idea_id
@@ -49,7 +78,17 @@ router.get('/:id', (req, res) => {
       if (!idea) {
         return res.status(404).json({ error: 'Idea not found' });
       }
-      res.json(idea);
+      // Also get active development if exists
+      db.get(
+        `SELECT d.*, dev.username as developer_username
+         FROM developments d
+         JOIN users dev ON d.developer_id = dev.id
+         WHERE d.idea_id = ? AND d.status = 'started'`,
+        [req.params.id],
+        (err, activeDevelopment) => {
+          res.json({ ...idea, activeDevelopment });
+        }
+      );
     }
   );
 });

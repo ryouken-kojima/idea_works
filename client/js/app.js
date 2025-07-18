@@ -12,7 +12,11 @@ const router = {
     '/dashboard': renderDashboard,
     '/ideas': renderIdeas,
     '/idea': renderIdeaDetail,
-    '/post-idea': renderPostIdea
+    '/post-idea': renderPostIdea,
+    '/chat': renderChat,
+    '/requests': renderRequests,
+    '/request': renderRequestDetail,
+    '/development': renderDevelopmentDetail
 };
 
 function navigateTo(path) {
@@ -35,6 +39,7 @@ function updateNav() {
             <a href="/dashboard" onclick="navigateTo('/dashboard'); return false;" class="text-gray-600 hover:text-indigo-600">ダッシュボード</a>
             <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア一覧</a>
             ${state.user?.role === 'client' ? '<a href="/post-idea" onclick="navigateTo(\'/post-idea\'); return false;" class="text-gray-600 hover:text-indigo-600">アイディア投稿</a>' : ''}
+            <a href="/requests" onclick="navigateTo('/requests'); return false;" class="text-gray-600 hover:text-indigo-600">開発リクエスト</a>
             <button onclick="logout()" class="text-red-600 hover:text-red-700">ログアウト</button>
         `;
     } else {
@@ -123,21 +128,56 @@ async function renderDashboard() {
 
 async function renderClientDashboard() {
     try {
-        const response = await fetch(`${API_URL}/ideas/my/ideas`, {
+        const response = await fetch(`${API_URL}/dashboard`, {
             headers: { 'Authorization': `Bearer ${state.token}` }
         });
-        const ideas = await response.json();
+        const data = await response.json();
+        const ideas = data.ideas || [];
+        const developments = data.developments || [];
         
         return `
             <div>
+                ${developments.length > 0 ? `
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-bold mb-4">進行中の開発プロジェクト</h2>
+                        <div class="grid gap-4">
+                            ${developments.map(dev => `
+                                <div class="bg-blue-50 border border-blue-200 p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
+                                     onclick="navigateTo('/development?id=${dev.id}')">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <h3 class="text-lg font-semibold text-blue-900">${dev.idea_title}</h3>
+                                            <p class="text-sm text-gray-600">開発者: ${dev.developer_username}</p>
+                                            <p class="text-xs text-gray-500">開始日: ${new Date(dev.created_at).toLocaleDateString()}</p>
+                                        </div>
+                                        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                                            開発詳細へ
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
                 <h2 class="text-2xl font-bold mb-6">マイアイディア</h2>
                 <div class="grid gap-4">
                     ${ideas.map(idea => `
                         <div class="bg-white p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
                              onclick="navigateTo('/idea?id=${idea.id}')">
-                            <h3 class="text-lg font-semibold">${idea.title}</h3>
-                            <p class="text-gray-600 mb-2">${idea.description}</p>
-                            <div class="flex justify-between items-center">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold">${idea.title}</h3>
+                                    <p class="text-gray-600 mb-2">${idea.description}</p>
+                                </div>
+                                ${idea.pending_requests_count > 0 ? `
+                                    <div class="ml-4 text-center">
+                                        <div class="text-2xl font-bold text-orange-600">${idea.pending_requests_count}</div>
+                                        <div class="text-xs text-gray-600">リクエスト</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="flex justify-between items-center mt-2">
                                 <span class="inline-block px-3 py-1 text-sm rounded-full 
                                     ${idea.status === 'open' ? 'bg-green-100 text-green-800' : 
                                       idea.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
@@ -164,33 +204,62 @@ async function renderClientDashboard() {
 
 async function renderDeveloperDashboard() {
     try {
-        const response = await fetch(`${API_URL}/developments/my/developments`, {
+        const response = await fetch(`${API_URL}/dashboard`, {
             headers: { 'Authorization': `Bearer ${state.token}` }
         });
-        const developments = await response.json();
+        const data = await response.json();
+        const developments = data.developments || [];
+        const requests = data.requests || [];
         
         return `
             <div>
-                <h2 class="text-2xl font-bold mb-6">開発中のアイディア</h2>
-                <div class="grid gap-4">
-                    ${developments.map(dev => `
-                        <div class="bg-white p-4 rounded shadow">
-                            <h3 class="text-lg font-semibold">${dev.title}</h3>
-                            <p class="text-gray-600 mb-2">${dev.description}</p>
-                            ${dev.status === 'started' ? `
-                                <form onsubmit="handleSubmitDeliverable(event, ${dev.id})">
-                                    <input type="url" name="url" placeholder="成果物URL" required 
-                                           class="w-full border rounded px-3 py-2 mb-2">
-                                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                                        成果物を提出
-                                    </button>
-                                </form>
-                            ` : `
-                                <p class="text-green-600">完了: ${dev.deliverable_url}</p>
-                            `}
+                ${developments.length > 0 ? `
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-bold mb-4">進行中の開発プロジェクト</h2>
+                        <div class="grid gap-4">
+                            ${developments.map(dev => `
+                                <div class="bg-green-50 border border-green-200 p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
+                                     onclick="navigateTo('/development?id=${dev.id}')">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <h3 class="text-lg font-semibold text-green-900">${dev.idea_title}</h3>
+                                            <p class="text-sm text-gray-600">依頼者: ${dev.client_username}</p>
+                                            <p class="text-xs text-gray-500">開始日: ${new Date(dev.created_at).toLocaleDateString()}</p>
+                                        </div>
+                                        <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                            開発詳細へ
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
-                    `).join('')}
-                </div>
+                    </div>
+                ` : ''}
+                
+                ${requests.length > 0 ? `
+                    <div>
+                        <h2 class="text-2xl font-bold mb-4">開発リクエスト</h2>
+                        <div class="grid gap-4">
+                            ${requests.map(req => `
+                                <div class="bg-white p-4 rounded shadow hover:shadow-lg transition-shadow cursor-pointer"
+                                     onclick="navigateTo('/request?id=${req.id}')">
+                                    <h3 class="text-lg font-semibold">${req.title}</h3>
+                                    <p class="text-gray-600 mb-2">${req.description}</p>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-500">アイデア: ${req.idea_title}</span>
+                                        <span class="px-3 py-1 text-sm rounded-full ${
+                                            req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            req.status === 'accepted' || req.status === 'in_progress' ? 'bg-green-100 text-green-800' :
+                                            'bg-gray-100 text-gray-800'
+                                        }">
+                                            ${getStatusLabel(req.status)}
+                                        </span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     } catch (error) {
@@ -235,6 +304,11 @@ async function renderIdeas() {
                                         by ${idea.username || idea.user_email}
                                     </span>
                                 </div>
+                                ${idea.pending_requests_count > 0 ? `
+                                    <div class="mt-2 text-sm text-orange-600 font-semibold">
+                                        🔔 ${idea.pending_requests_count}件の開発リクエスト
+                                    </div>
+                                ` : ''}
                             </div>
                             
                             <!-- ステータスバッジ -->
@@ -310,6 +384,163 @@ function renderPostIdea() {
     `;
 }
 
+async function renderChat() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ideaId = urlParams.get('ideaId');
+    
+    if (!state.token) {
+        navigateTo('/login');
+        return;
+    }
+    
+    if (!ideaId) {
+        document.getElementById('main-content').innerHTML = '<p>アイデアが指定されていません</p>';
+        return;
+    }
+    
+    try {
+        // アイデア情報を取得
+        const ideaResponse = await fetch(`${API_URL}/ideas/${ideaId}`);
+        if (!ideaResponse.ok) {
+            throw new Error('アイデア情報の取得に失敗しました');
+        }
+        const idea = await ideaResponse.json();
+        
+        // チャットメッセージを取得
+        const messagesResponse = await fetch(`${API_URL}/chat/messages/${ideaId}`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        
+        if (!messagesResponse.ok && messagesResponse.status === 401) {
+            // 認証エラーの場合はログイン画面へ
+            navigateTo('/login');
+            return;
+        }
+        
+        const chatMessages = messagesResponse.ok ? await messagesResponse.json() : [];
+        
+        document.getElementById('main-content').innerHTML = `
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow-lg h-[calc(100vh-200px)] flex flex-col">
+                    <!-- ヘッダー -->
+                    <div class="border-b p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-semibold">${idea.title}</h2>
+                                <p class="text-sm text-gray-600">
+                                    ${state.user.role === 'client' ? '開発者とのやりとり' : 'クライアントとのやりとり'}
+                                </p>
+                            </div>
+                            <button onclick="navigateTo('/idea?id=${ideaId}')" 
+                                    class="text-gray-500 hover:text-gray-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- メッセージエリア -->
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        ${chatMessages.length === 0 ? `
+                            <div class="text-center text-gray-500 mt-8">
+                                <p>メッセージはまだありません</p>
+                                <p class="text-sm mt-2">最初のメッセージを送って会話を始めましょう！</p>
+                            </div>
+                        ` : chatMessages.map(msg => `
+                            <div class="flex ${msg.sender_id === state.user.id ? 'justify-end' : 'justify-start'}">
+                                <div class="max-w-xs lg:max-w-md">
+                                    <div class="${msg.sender_id === state.user.id 
+                                        ? 'bg-blue-600 text-white' 
+                                        : 'bg-gray-200 text-gray-800'} 
+                                        rounded-lg px-4 py-2">
+                                        <p class="text-sm">${msg.message}</p>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1 ${msg.sender_id === state.user.id ? 'text-right' : ''}">
+                                        ${new Date(msg.created_at).toLocaleString('ja-JP', { 
+                                            month: 'numeric', 
+                                            day: 'numeric', 
+                                            hour: '2-digit', 
+                                            minute: '2-digit'
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <!-- 入力エリア -->
+                    <div class="border-t p-4">
+                        <form onsubmit="handleSendMessage(event, ${ideaId})" class="flex gap-2">
+                            <input type="text" 
+                                   name="message"
+                                   placeholder="メッセージを入力..."
+                                   required
+                                   class="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button type="submit" 
+                                    class="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition-colors">
+                                送信
+                            </button>
+                        </form>
+                        
+                        ${state.user.role === 'developer' && idea.status === 'open' && !idea.development_id ? `
+                            <div class="mt-4 text-center">
+                                <p class="text-sm text-gray-600 mb-2">やりとりを通じて要件が明確になりましたか？</p>
+                                <button onclick="handleSendDevelopmentRequest(${ideaId})" 
+                                        class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition-colors">
+                                    開発依頼リクエストを送る
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // メッセージエリアを最下部にスクロール
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // 入力欄にフォーカスを設定
+        const messageInput = document.querySelector('input[name="message"]');
+        if (messageInput) {
+            messageInput.focus();
+        }
+        
+        // 定期的にメッセージを更新（ポーリング）
+        const pollingInterval = setInterval(async () => {
+            // 現在のパスがチャット画面でない場合は停止
+            if (window.location.pathname !== '/chat') {
+                clearInterval(pollingInterval);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/chat/messages/${ideaId}`, {
+                    headers: { 'Authorization': `Bearer ${state.token}` }
+                });
+                
+                if (response.ok) {
+                    const newMessages = await response.json();
+                    if (newMessages.length > chatMessages.length) {
+                        // 新しいメッセージがある場合は画面を更新
+                        renderChat();
+                    }
+                } else if (response.status === 401) {
+                    // 認証エラーの場合はポーリングを停止
+                    clearInterval(pollingInterval);
+                    navigateTo('/login');
+                }
+            } catch (error) {
+                console.error('Failed to fetch messages:', error);
+            }
+        }, 3000); // 3秒ごとに更新
+        
+    } catch (error) {
+        document.getElementById('main-content').innerHTML = '<p>エラーが発生しました</p>';
+    }
+}
+
 async function renderIdeaDetail() {
     const urlParams = new URLSearchParams(window.location.search);
     const ideaId = urlParams.get('id');
@@ -320,8 +551,13 @@ async function renderIdeaDetail() {
     }
     
     try {
-        const response = await fetch(`${API_URL}/ideas/${ideaId}`);
-        const idea = await response.json();
+        const [ideaResponse, requestsResponse] = await Promise.all([
+            fetch(`${API_URL}/ideas/${ideaId}`),
+            fetch(`${API_URL}/ideas/${ideaId}/requests`)
+        ]);
+        
+        const idea = await ideaResponse.json();
+        const requests = await requestsResponse.json();
         
         const isOwner = state.user && state.user.id === idea.user_id;
         const isDeveloper = state.user && state.user.role === 'developer';
@@ -465,12 +701,60 @@ async function renderIdeaDetail() {
                     </div>
                     
                     ${isDeveloper && idea.status === 'open' && !idea.development_id ? `
-                        <button onclick="handleStartDevelopment(${ideaId})" 
-                                class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">
-                            開発を開始する
+                        <div class="flex gap-4">
+                            <button onclick="showDevelopmentRequestModal(${ideaId})" 
+                                    class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">
+                                開発リクエストを送る
+                            </button>
+                        </div>
+                    ` : ''}
+                    
+                    ${(isOwner || isDeveloper) && idea.activeDevelopment ? `
+                        <button onclick="navigateTo('/development?id=${idea.activeDevelopment.id}')" 
+                                class="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700">
+                            開発詳細を見る
                         </button>
                     ` : ''}
                 </div>
+                
+                ${isOwner && requests.length > 0 ? `
+                    <div class="mt-6">
+                        <h3 class="text-xl font-bold mb-4">開発リクエスト (${requests.length}件)</h3>
+                        <div class="space-y-4">
+                            ${requests.map(request => `
+                                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <h4 class="font-semibold">${request.title}</h4>
+                                            <p class="text-gray-600 text-sm mt-1">${request.description}</p>
+                                            <div class="flex gap-4 mt-2 text-sm text-gray-500">
+                                                <span>開発者: ${request.developer_username}</span>
+                                                ${request.proposed_budget ? `<span>提案予算: ¥${request.proposed_budget.toLocaleString()}</span>` : ''}
+                                                ${request.proposed_deadline ? `<span>提案納期: ${new Date(request.proposed_deadline).toLocaleDateString()}</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="text-sm">
+                                            <span class="px-3 py-1 rounded-full ${
+                                                request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                request.status === 'accepted' || request.status === 'in_progress' ? 'bg-green-100 text-green-800' :
+                                                request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }">
+                                                ${getStatusLabel(request.status)}
+                                            </span>
+                                            ${request.status === 'pending' ? `
+                                                <button onclick="navigateTo('/request?id=${request.id}')" 
+                                                        class="ml-2 text-blue-600 hover:text-blue-800">
+                                                    詳細を見る
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     } catch (error) {
@@ -516,6 +800,7 @@ async function handleRegister(event) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 email: formData.get('email'),
+                username: formData.get('username'),
                 password: formData.get('password'),
                 role: formData.get('role')
             })
@@ -931,6 +1216,101 @@ function enableThumbnailGeneration() {
 }
 
 // Generate thumbnail using AI
+async function handleSendDevelopmentRequest(ideaId) {
+    if (!state.token) {
+        alert('ログインが必要です');
+        return;
+    }
+    
+    if (confirm('この開発依頼リクエストを送信しますか？')) {
+        try {
+            // 現在は開発を即座に開始する仕組みを流用
+            const response = await fetch(`${API_URL}/developments/start`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${state.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ idea_id: ideaId })
+            });
+            
+            const data = await response.json();
+            if (response.ok) {
+                alert('開発依頼リクエストを送信しました！');
+                navigateTo('/dashboard');
+            } else {
+                alert(data.error || '送信に失敗しました');
+            }
+        } catch (error) {
+            alert('エラーが発生しました');
+        }
+    }
+}
+
+async function handleSendMessage(event, ideaId) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const message = formData.get('message');
+    
+    if (!message.trim()) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/chat/messages`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${state.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                idea_id: ideaId,
+                message: message
+            })
+        });
+        
+        if (response.ok) {
+            const newMessage = await response.json();
+            // メッセージをUIに追加
+            const messagesDiv = document.getElementById('chat-messages');
+            const messageHTML = `
+                <div class="flex justify-end">
+                    <div class="max-w-xs lg:max-w-md">
+                        <div class="bg-blue-600 text-white rounded-lg px-4 py-2">
+                            <p class="text-sm">${newMessage.message}</p>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 text-right">
+                            ${new Date(newMessage.created_at).toLocaleString('ja-JP', { 
+                                month: 'numeric', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit'
+                            })}
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            // 空メッセージの表示を削除
+            const emptyMessage = messagesDiv.querySelector('.text-center.text-gray-500');
+            if (emptyMessage) {
+                emptyMessage.remove();
+            }
+            
+            messagesDiv.insertAdjacentHTML('beforeend', messageHTML);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            // フォームをリセットしてフォーカスを維持
+            const messageInput = event.target.querySelector('input[name="message"]');
+            event.target.reset();
+            messageInput.focus();
+        } else {
+            const error = await response.json();
+            alert(error.error || 'メッセージの送信に失敗しました');
+        }
+    } catch (error) {
+        alert('メッセージの送信に失敗しました');
+    }
+}
+
 async function generateThumbnail() {
     const titleInput = document.getElementById('idea-title');
     const title = titleInput?.value.trim();
@@ -983,6 +1363,364 @@ async function generateThumbnail() {
     }
 }
 
+async function renderRequests() {
+    if (!state.token) {
+        navigateTo('/login');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/requests`, {
+            headers: {
+                'Authorization': `Bearer ${state.token}`
+            }
+        });
+
+        const requests = await response.json();
+
+        document.getElementById('main-content').innerHTML = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">開発リクエスト</h2>
+                
+                <div class="grid gap-4">
+                    ${requests.map(request => `
+                        <div class="bg-white p-6 rounded shadow hover:shadow-lg transition cursor-pointer" 
+                             onclick="navigateTo('/request?id=${request.id}')">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold mb-2">${request.title}</h3>
+                                    <p class="text-gray-600 mb-2">${request.description}</p>
+                                    <div class="flex gap-4 text-sm text-gray-500">
+                                        <span>アイデア: ${request.idea_title}</span>
+                                        ${request.proposed_budget ? `<span>提案予算: ¥${request.proposed_budget.toLocaleString()}</span>` : ''}
+                                        <span>ステータス: ${getStatusLabel(request.status)}</span>
+                                        ${request.unread_count > 0 ? `<span class="bg-red-500 text-white px-2 py-1 rounded">未読: ${request.unread_count}</span>` : ''}
+                                    </div>
+                                </div>
+                                ${request.idea_thumbnail ? `
+                                    <img src="${request.idea_thumbnail}" alt="${request.idea_title}" 
+                                         class="w-24 h-24 object-cover rounded ml-4">
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                    
+                    ${requests.length === 0 ? `
+                        <p class="text-gray-600 text-center py-8">開発リクエストはありません</p>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        document.getElementById('main-content').innerHTML = '<p>エラーが発生しました</p>';
+    }
+}
+
+async function renderRequestDetail() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestId = urlParams.get('id');
+    
+    if (!requestId || !state.token) {
+        navigateTo('/requests');
+        return;
+    }
+
+    try {
+        const [requestResponse, messagesResponse] = await Promise.all([
+            fetch(`${API_URL}/requests/${requestId}`, {
+                headers: {
+                    'Authorization': `Bearer ${state.token}`
+                }
+            }),
+            fetch(`${API_URL}/requests/${requestId}/messages`, {
+                headers: {
+                    'Authorization': `Bearer ${state.token}`
+                }
+            })
+        ]);
+
+        const request = await requestResponse.json();
+        const messages = await messagesResponse.json();
+
+        const isClient = state.user.id === request.client_id;
+        const isDeveloper = state.user.role === 'developer';
+
+        document.getElementById('main-content').innerHTML = `
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white p-6 rounded shadow mb-6">
+                    <h2 class="text-2xl font-bold mb-4">${request.title}</h2>
+                    <p class="text-gray-600 mb-4">${request.description}</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <span class="text-sm text-gray-500">アイデア:</span>
+                            <p>${request.idea_title}</p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-500">ステータス:</span>
+                            <p>${getStatusLabel(request.status)}</p>
+                        </div>
+                        ${request.proposed_budget ? `
+                            <div>
+                                <span class="text-sm text-gray-500">提案予算:</span>
+                                <p>¥${request.proposed_budget.toLocaleString()}</p>
+                            </div>
+                        ` : ''}
+                        ${request.proposed_deadline ? `
+                            <div>
+                                <span class="text-sm text-gray-500">提案納期:</span>
+                                <p>${new Date(request.proposed_deadline).toLocaleDateString()}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${isClient && request.status === 'pending' ? `
+                        <div class="flex gap-2">
+                            <button onclick="acceptRequest(${requestId})" 
+                                    class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                                承諾する
+                            </button>
+                            <button onclick="rejectRequest(${requestId})" 
+                                    class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                                拒否する
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="bg-white p-6 rounded shadow">
+                    <h3 class="text-lg font-semibold mb-4">メッセージ</h3>
+                    
+                    <div class="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                        ${messages.map(msg => `
+                            <div class="${msg.sender_id === state.user.id ? 'text-right' : 'text-left'}">
+                                <div class="inline-block bg-${msg.sender_id === state.user.id ? 'blue' : 'gray'}-100 
+                                            rounded-lg px-4 py-2 max-w-md">
+                                    <p class="text-sm font-semibold mb-1">${msg.sender_username}</p>
+                                    <p>${msg.message}</p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        ${new Date(msg.created_at).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                        `).join('')}
+                        
+                        ${messages.length === 0 ? `
+                            <p class="text-gray-500 text-center">まだメッセージはありません</p>
+                        ` : ''}
+                    </div>
+                    
+                    <form onsubmit="sendRequestMessage(event, ${requestId})" class="flex gap-2">
+                        <input type="text" 
+                               name="message" 
+                               placeholder="メッセージを入力" 
+                               required
+                               class="flex-1 border rounded px-3 py-2">
+                        <button type="submit" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            送信
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error:', error);
+        navigateTo('/requests');
+    }
+}
+
+async function showDevelopmentRequestModal(ideaId) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">開発リクエストを送る</h3>
+            <form onsubmit="createDevelopmentRequest(event, ${ideaId})">
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">タイトル</label>
+                    <input type="text" 
+                           name="title" 
+                           required 
+                           class="w-full border rounded px-3 py-2"
+                           placeholder="例: このアイデアの開発を担当させてください">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">提案内容</label>
+                    <textarea name="description" 
+                              required 
+                              rows="4"
+                              class="w-full border rounded px-3 py-2"
+                              placeholder="開発経験、スキル、実装方針などを記載してください"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">提案予算</label>
+                    <input type="number" 
+                           name="proposed_budget" 
+                           class="w-full border rounded px-3 py-2"
+                           placeholder="例: 50000">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2">提案納期</label>
+                    <input type="date" 
+                           name="proposed_deadline" 
+                           class="w-full border rounded px-3 py-2">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" 
+                            class="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+                        送信
+                    </button>
+                    <button type="button" 
+                            onclick="this.closest('.fixed').remove()" 
+                            class="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400">
+                        キャンセル
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function createDevelopmentRequest(event, ideaId) {
+    event.preventDefault();
+    
+    console.log('Current user:', state.user);
+    
+    const formData = new FormData(event.target);
+    const data = {
+        idea_id: ideaId,
+        title: formData.get('title'),
+        description: formData.get('description'),
+        proposed_budget: formData.get('proposed_budget') ? parseInt(formData.get('proposed_budget')) : null,
+        proposed_deadline: formData.get('proposed_deadline') || null
+    };
+
+    console.log('Sending request:', data);
+
+    try {
+        const response = await fetch(`${API_URL}/requests`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify(data)
+        });
+
+        const responseData = await response.json();
+        
+        if (response.ok) {
+            alert('開発リクエストを送信しました');
+            document.querySelector('.fixed').remove();
+            navigateTo('/requests');
+        } else {
+            console.error('Request failed:', responseData);
+            alert(responseData.message || '送信に失敗しました');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('エラーが発生しました');
+    }
+}
+
+async function acceptRequest(requestId) {
+    if (!confirm('この開発リクエストを承諾しますか？')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/requests/${requestId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({
+                status: 'accepted'
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            alert('開発リクエストを承諾しました。開発が開始されます。');
+            if (data.developmentId) {
+                navigateTo(`/development?id=${data.developmentId}`);
+            } else {
+                renderRequestDetail();
+            }
+        } else {
+            alert('エラーが発生しました');
+        }
+    } catch (error) {
+        alert('エラーが発生しました');
+    }
+}
+
+async function rejectRequest(requestId) {
+    if (!confirm('この開発リクエストを拒否しますか？')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/requests/${requestId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({
+                status: 'rejected'
+            })
+        });
+
+        if (response.ok) {
+            alert('開発リクエストを拒否しました');
+            renderRequestDetail();
+        } else {
+            alert('エラーが発生しました');
+        }
+    } catch (error) {
+        alert('エラーが発生しました');
+    }
+}
+
+async function sendRequestMessage(event, requestId) {
+    event.preventDefault();
+    
+    const message = event.target.message.value;
+    
+    try {
+        const response = await fetch(`${API_URL}/requests/${requestId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ message })
+        });
+
+        if (response.ok) {
+            event.target.reset();
+            renderRequestDetail();
+        } else {
+            alert('送信に失敗しました');
+        }
+    } catch (error) {
+        alert('エラーが発生しました');
+    }
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        pending: '検討中',
+        accepted: '承諾済み',
+        rejected: '拒否',
+        in_progress: '開発中',
+        completed: '完了',
+        cancelled: 'キャンセル'
+    };
+    return labels[status] || status;
+}
+
 window.navigateTo = navigateTo;
 window.handleLogin = handleLogin;
 window.handleRegister = handleRegister;
@@ -1000,6 +1738,274 @@ window.updateIdeaBudget = updateIdeaBudget;
 window.deleteIdea = deleteIdea;
 window.enableThumbnailGeneration = enableThumbnailGeneration;
 window.generateThumbnail = generateThumbnail;
+window.handleSendDevelopmentRequest = handleSendDevelopmentRequest;
+window.handleSendMessage = handleSendMessage;
+window.showDevelopmentRequestModal = showDevelopmentRequestModal;
+window.createDevelopmentRequest = createDevelopmentRequest;
+async function renderDevelopmentDetail() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const developmentId = urlParams.get('id');
+    
+    if (!developmentId || !state.token) {
+        navigateTo('/dashboard');
+        return;
+    }
+
+    try {
+        const [devResponse, threadsResponse] = await Promise.all([
+            fetch(`${API_URL}/development-detail/${developmentId}`, {
+                headers: { 'Authorization': `Bearer ${state.token}` }
+            }),
+            fetch(`${API_URL}/development-detail/${developmentId}/threads`, {
+                headers: { 'Authorization': `Bearer ${state.token}` }
+            })
+        ]);
+
+        if (!devResponse.ok || !threadsResponse.ok) {
+            throw new Error('Failed to fetch data');
+        }
+
+        const development = await devResponse.json();
+        const threads = await threadsResponse.json();
+        
+        const isClient = state.user.id === development.client_id;
+        const isDeveloper = state.user.id === development.developer_id;
+
+        document.getElementById('main-content').innerHTML = `
+            <div class="max-w-6xl mx-auto">
+                <div class="bg-white p-6 rounded shadow mb-6">
+                    <h2 class="text-2xl font-bold mb-4">${development.idea_title}</h2>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <span class="text-sm text-gray-500">依頼者:</span>
+                            <p>${development.client_username}</p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-500">開発者:</span>
+                            <p>${development.developer_username}</p>
+                        </div>
+                        ${development.proposed_budget ? `
+                            <div>
+                                <span class="text-sm text-gray-500">予算:</span>
+                                <p>¥${development.proposed_budget.toLocaleString()}</p>
+                            </div>
+                        ` : ''}
+                        ${development.proposed_deadline ? `
+                            <div>
+                                <span class="text-sm text-gray-500">納期:</span>
+                                <p>${new Date(development.proposed_deadline).toLocaleDateString()}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="mb-4">
+                        <span class="text-sm text-gray-500">開発内容:</span>
+                        <p class="text-gray-700">${development.request_description || development.idea_description}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="showCreateThreadModal(${developmentId})" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            新しいスレッドを作成
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded shadow">
+                    <h3 class="text-xl font-bold mb-4">スレッド一覧</h3>
+                    <div class="space-y-4">
+                        ${threads.map(thread => `
+                            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+                                 onclick="showThreadMessages(${developmentId}, ${thread.id})">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-semibold">${thread.title}</h4>
+                                        <p class="text-sm text-gray-500">
+                                            作成者: ${thread.created_by_username} · 
+                                            メッセージ: ${thread.message_count || 0}件
+                                        </p>
+                                    </div>
+                                    <span class="text-xs text-gray-400">
+                                        ${new Date(thread.updated_at).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                        
+                        ${threads.length === 0 ? `
+                            <p class="text-gray-500 text-center py-8">まだスレッドがありません</p>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error:', error);
+        navigateTo('/dashboard');
+    }
+}
+
+async function showCreateThreadModal(developmentId) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold mb-4">新しいスレッドを作成</h3>
+            <form onsubmit="createThread(event, ${developmentId})">
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">タイトル</label>
+                    <input type="text" 
+                           name="title" 
+                           required 
+                           class="w-full border rounded px-3 py-2"
+                           placeholder="例: 機能について相談">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" 
+                            class="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+                        作成
+                    </button>
+                    <button type="button" 
+                            onclick="this.closest('.fixed').remove()" 
+                            class="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400">
+                        キャンセル
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function createThread(event, developmentId) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const title = formData.get('title');
+
+    try {
+        const response = await fetch(`${API_URL}/development-detail/${developmentId}/threads`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ title })
+        });
+
+        if (response.ok) {
+            document.querySelector('.fixed').remove();
+            renderDevelopmentDetail();
+        } else {
+            alert('エラーが発生しました');
+        }
+    } catch (error) {
+        alert('エラーが発生しました');
+    }
+}
+
+async function showThreadMessages(developmentId, threadId) {
+    try {
+        const response = await fetch(
+            `${API_URL}/development-detail/${developmentId}/threads/${threadId}/messages`,
+            {
+                headers: { 'Authorization': `Bearer ${state.token}` }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch messages');
+        }
+
+        const messages = await response.json();
+        
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">スレッドメッセージ</h3>
+                    <button onclick="this.closest('.fixed').remove()" 
+                            class="text-gray-500 hover:text-gray-700">
+                        ✕
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto mb-4 space-y-4">
+                    ${messages.map(msg => `
+                        <div class="${msg.sender_id === state.user.id ? 'text-right' : 'text-left'}">
+                            <div class="inline-block bg-${msg.sender_id === state.user.id ? 'blue' : 'gray'}-100 
+                                        rounded-lg px-4 py-2 max-w-md">
+                                <p class="text-sm font-semibold mb-1">${msg.sender_username}</p>
+                                <p>${msg.message}</p>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    ${new Date(msg.created_at).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    `).join('')}
+                    
+                    ${messages.length === 0 ? `
+                        <p class="text-gray-500 text-center">まだメッセージはありません</p>
+                    ` : ''}
+                </div>
+                
+                <form onsubmit="sendThreadMessage(event, ${developmentId}, ${threadId})" 
+                      class="flex gap-2">
+                    <input type="text" 
+                           name="message" 
+                           placeholder="メッセージを入力" 
+                           required
+                           class="flex-1 border rounded px-3 py-2">
+                    <button type="submit" 
+                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        送信
+                    </button>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('Error:', error);
+        alert('メッセージの取得に失敗しました');
+    }
+}
+
+async function sendThreadMessage(event, developmentId, threadId) {
+    event.preventDefault();
+    
+    const message = event.target.message.value;
+    
+    try {
+        const response = await fetch(
+            `${API_URL}/development-detail/${developmentId}/threads/${threadId}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${state.token}`
+                },
+                body: JSON.stringify({ message })
+            }
+        );
+
+        if (response.ok) {
+            event.target.reset();
+            document.querySelector('.fixed').remove();
+            showThreadMessages(developmentId, threadId);
+        } else {
+            alert('送信に失敗しました');
+        }
+    } catch (error) {
+        alert('エラーが発生しました');
+    }
+}
+
+window.acceptRequest = acceptRequest;
+window.rejectRequest = rejectRequest;
+window.sendRequestMessage = sendRequestMessage;
+window.showCreateThreadModal = showCreateThreadModal;
+window.createThread = createThread;
+window.showThreadMessages = showThreadMessages;
+window.sendThreadMessage = sendThreadMessage;
 
 window.addEventListener('popstate', render);
 checkAuth();
