@@ -97,13 +97,13 @@ export function createLayout(content, activeSection = '') {
             <!-- 開発者メニュー -->
             <div class="mb-6">
               <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">アクティビティ</h3>
-              <a href="/requests" onclick="navigateTo('/requests'); return false;"
-                 class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${activeSection === 'requests' ? 'bg-indigo-50 text-indigo-700' : ''}">
+              <a href="/dev-inbox" onclick="navigateTo('/dev-inbox'); return false;"
+                 class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${activeSection === 'dev-inbox' ? 'bg-indigo-50 text-indigo-700' : ''}">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
                 </svg>
-                開発リクエスト
+                受信ボックス
               </a>
             </div>
             
@@ -118,6 +118,19 @@ export function createLayout(content, activeSection = '') {
                 </svg>
                 みんなのアイディア
               </a>
+              <a href="/applied-ideas" onclick="navigateTo('/applied-ideas'); return false;"
+                 class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${activeSection === 'applied-ideas' ? 'bg-indigo-50 text-indigo-700' : ''}">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                </svg>
+                応募したアイディア
+              </a>
+            </div>
+            
+            <!-- コーダーセクション -->
+            <div class="mb-6">
+              <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">コーダー</h3>
               <a href="/developers" onclick="navigateTo('/developers'); return false;"
                  class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${activeSection === 'developers' ? 'bg-indigo-50 text-indigo-700' : ''}">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,6 +138,27 @@ export function createLayout(content, activeSection = '') {
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                 </svg>
                 開発者を探す
+              </a>
+            </div>
+            
+            <!-- プロジェクト管理セクション -->
+            <div class="mb-6">
+              <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">プロジェクト管理</h3>
+              <a href="/dev-ongoing" onclick="navigateTo('/dev-ongoing'); return false;"
+                 class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${activeSection === 'dev-ongoing' ? 'bg-indigo-50 text-indigo-700' : ''}">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                進行中プロジェクト
+              </a>
+              <a href="/dev-completed" onclick="navigateTo('/dev-completed'); return false;"
+                 class="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${activeSection === 'dev-completed' ? 'bg-indigo-50 text-indigo-700' : ''}">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                        d="M9 12l2 2 4-4M12 2a10 10 0 100 20 10 10 0 000-20z"></path>
+                </svg>
+                完了プロジェクト
               </a>
             </div>
             ` /* endif userRole */}

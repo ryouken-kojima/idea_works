@@ -12,9 +12,13 @@ const router = {
     '/login': renderLogin,
     '/register': renderRegister,
     '/inbox': renderInbox,
+    '/dev-inbox': renderDevInbox,
     '/my-ideas': renderMyIdeas,
+    '/applied-ideas': renderAppliedIdeas,
     '/ongoing-projects': renderOngoingProjects,
     '/completed-projects': renderCompletedProjects,
+    '/dev-ongoing': renderDevOngoing,
+    '/dev-completed': renderDevCompleted,
     '/idea': renderIdeaDetail,
     '/post-idea': renderPostIdea,
     '/chat': renderChat,
@@ -2557,6 +2561,293 @@ async function renderDevelopers() {
     
     // 初期検索を実行
     setTimeout(() => searchDevelopers(), 100);
+}
+
+// 開発者の受信箱
+async function renderDevInbox() {
+    if (!state.token || state.user?.role !== 'developer') {
+        navigateTo('/');
+        return;
+    }
+    
+    const content = `
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6">受信箱</h2>
+            
+            <div class="bg-white rounded-lg shadow p-8 text-center">
+                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                </svg>
+                <h3 class="text-lg font-semibold mb-2">通知機能は準備中です</h3>
+                <p class="text-gray-600">新しい開発リクエストや重要なお知らせをこちらに表示予定です。</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('app').innerHTML = createLayout(content, 'dev-inbox');
+    setPageTitle('受信箱');
+    setupLayoutEventListeners();
+}
+
+// 開発者が応募したアイデア一覧
+async function renderAppliedIdeas() {
+    if (!state.token || state.user?.role !== 'developer') {
+        navigateTo('/');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/requests/my-requests`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const requests = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">応募したアイデア</h2>
+                
+                ${requests.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold mb-2">応募したアイデアはありません</h3>
+                        <p class="text-gray-600 mb-4">興味のあるアイデアを見つけて開発リクエストを送りましょう。</p>
+                        <a href="/ideas" onclick="navigateTo('/ideas'); return false;" class="text-indigo-600 hover:text-indigo-800">アイデア一覧を見る</a>
+                    </div>
+                ` : `
+                    <div class="grid gap-4">
+                        ${requests.map(request => `
+                            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-semibold mb-2">
+                                            <a href="/request?id=${request.id}" onclick="navigateTo('/request?id=${request.id}'); return false;" class="text-gray-800 hover:text-indigo-600">
+                                                ${request.title}
+                                            </a>
+                                        </h3>
+                                        <p class="text-gray-600 mb-2">アイデア: ${request.idea_title || 'タイトルなし'}</p>
+                                        <p class="text-sm text-gray-500">提案日: ${new Date(request.created_at).toLocaleDateString('ja-JP')}</p>
+                                        
+                                        ${request.proposed_budget ? `
+                                            <p class="text-sm text-gray-600 mt-2">提案予算: ¥${request.proposed_budget.toLocaleString()}</p>
+                                        ` : ''}
+                                        ${request.proposed_deadline ? `
+                                            <p class="text-sm text-gray-600">提案期限: ${new Date(request.proposed_deadline).toLocaleDateString('ja-JP')}</p>
+                                        ` : ''}
+                                    </div>
+                                    <span class="px-3 py-1 text-sm rounded-full ${
+                                        request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        request.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                        request.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                    }">
+                                        ${
+                                            request.status === 'pending' ? '検討中' :
+                                            request.status === 'accepted' ? '承諾済み' :
+                                            request.status === 'rejected' ? '却下' :
+                                            request.status
+                                        }
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'applied-ideas');
+        setPageTitle('応募したアイデア');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error fetching applied ideas:', error);
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">応募したアイデア</h2>
+                <div class="bg-white rounded-lg shadow p-8 text-center">
+                    <p class="text-red-600">データの取得中にエラーが発生しました。</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('app').innerHTML = createLayout(content, 'applied-ideas');
+        setPageTitle('応募したアイデア');
+        setupLayoutEventListeners();
+    }
+}
+
+// 開発者の進行中プロジェクト
+async function renderDevOngoing() {
+    if (!state.token || state.user?.role !== 'developer') {
+        navigateTo('/');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/developments?status=started`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const developments = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">進行中プロジェクト</h2>
+                
+                ${developments.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold mb-2">進行中のプロジェクトはありません</h3>
+                        <p class="text-gray-600">承諾されたリクエストがここに表示されます。</p>
+                    </div>
+                ` : `
+                    <div class="grid gap-4">
+                        ${developments.map(dev => `
+                            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-semibold mb-2">
+                                            <a href="/development?id=${dev.id}" onclick="navigateTo('/development?id=${dev.id}'); return false;" class="text-gray-800 hover:text-indigo-600">
+                                                ${dev.idea_title || 'プロジェクト'}
+                                            </a>
+                                        </h3>
+                                        <p class="text-gray-600 mb-2">依頼者: ${dev.client_name || 'クライアント'}</p>
+                                        <p class="text-sm text-gray-500">開始日: ${new Date(dev.created_at).toLocaleDateString('ja-JP')}</p>
+                                        
+                                        ${dev.budget ? `
+                                            <p class="text-sm text-gray-600 mt-2">予算: ¥${dev.budget.toLocaleString()}</p>
+                                        ` : ''}
+                                        ${dev.deadline ? `
+                                            <p class="text-sm text-gray-600">期限: ${new Date(dev.deadline).toLocaleDateString('ja-JP')}</p>
+                                        ` : ''}
+                                        
+                                        <div class="mt-4">
+                                            <div class="flex items-center text-sm text-gray-600">
+                                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                進捗: ${dev.progress || 0}%
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                                <div class="bg-indigo-600 h-2 rounded-full" style="width: ${dev.progress || 0}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span class="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800">
+                                        開発中
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'dev-ongoing');
+        setPageTitle('進行中プロジェクト');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error fetching ongoing projects:', error);
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">進行中プロジェクト</h2>
+                <div class="bg-white rounded-lg shadow p-8 text-center">
+                    <p class="text-red-600">データの取得中にエラーが発生しました。</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('app').innerHTML = createLayout(content, 'dev-ongoing');
+        setPageTitle('進行中プロジェクト');
+        setupLayoutEventListeners();
+    }
+}
+
+// 開発者の完了プロジェクト
+async function renderDevCompleted() {
+    if (!state.token || state.user?.role !== 'developer') {
+        navigateTo('/');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/developments?status=completed`, {
+            headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        const developments = await response.json();
+        
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">完了プロジェクト</h2>
+                
+                ${developments.length === 0 ? `
+                    <div class="bg-white rounded-lg shadow p-8 text-center">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M12 2a10 10 0 100 20 10 10 0 000-20z"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold mb-2">完了したプロジェクトはまだありません</h3>
+                        <p class="text-gray-600">完成したプロジェクトがここに表示されます。</p>
+                    </div>
+                ` : `
+                    <div class="grid gap-4">
+                        ${developments.map(dev => `
+                            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-semibold mb-2">
+                                            <a href="/development?id=${dev.id}" onclick="navigateTo('/development?id=${dev.id}'); return false;" class="text-gray-800 hover:text-indigo-600">
+                                                ${dev.idea_title || 'プロジェクト'}
+                                            </a>
+                                        </h3>
+                                        <p class="text-gray-600 mb-2">依頼者: ${dev.client_name || 'クライアント'}</p>
+                                        <p class="text-sm text-gray-500">完了日: ${new Date(dev.completed_at || dev.updated_at).toLocaleDateString('ja-JP')}</p>
+                                        
+                                        ${dev.budget ? `
+                                            <p class="text-sm text-gray-600 mt-2">予算: ¥${dev.budget.toLocaleString()}</p>
+                                        ` : ''}
+                                        
+                                        ${dev.rating ? `
+                                            <div class="flex items-center mt-2">
+                                                <span class="text-sm text-gray-600 mr-2">評価:</span>
+                                                <div class="flex">
+                                                    ${[1, 2, 3, 4, 5].map(star => `
+                                                        <svg class="w-4 h-4 ${star <= dev.rating ? 'text-yellow-400' : 'text-gray-300'}" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                        </svg>
+                                                    `).join('')}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    <span class="px-3 py-1 text-sm rounded-full bg-green-100 text-green-800">
+                                        完了
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        document.getElementById('app').innerHTML = createLayout(content, 'dev-completed');
+        setPageTitle('完了プロジェクト');
+        setupLayoutEventListeners();
+    } catch (error) {
+        console.error('Error fetching completed projects:', error);
+        const content = `
+            <div class="max-w-6xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6">完了プロジェクト</h2>
+                <div class="bg-white rounded-lg shadow p-8 text-center">
+                    <p class="text-red-600">データの取得中にエラーが発生しました。</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('app').innerHTML = createLayout(content, 'dev-completed');
+        setPageTitle('完了プロジェクト');
+        setupLayoutEventListeners();
+    }
 }
 
 // 依頼者のホームページ
